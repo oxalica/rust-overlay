@@ -197,7 +197,7 @@ def sync_stable_channel(*, stop_if_exists, max_fetch=None):
         if out_path.exists():
             if not stop_if_exists:
                 continue
-            print('Stopped on existing version')
+            print(f'{version} is already fetched. Stopped')
             break
         fetch_stable_manifest(version, out_path)
         processed += 1
@@ -228,14 +228,14 @@ def sync_nightly_channel(*, stop_if_exists, max_fetch=None):
     print(f'The latest nightly version is {date}')
 
     processed = 0
-    date + datetime.timedelta(days=1)
+    date += datetime.timedelta(days=1)
     while date > MIN_NIGHTLY_DATE:
         date -= datetime.timedelta(days=1)
         out_path = Path(f'manifests/nightly/{date.year}/{date.isoformat()}.nix')
         if out_path.exists():
             if not stop_if_exists:
                 continue
-            print('Stopped on existing version')
+            print(f'{date} is already fetched. Stopped')
             break
         fetch_nightly_manifest(date.isoformat(), out_path)
         processed += 1
@@ -256,8 +256,10 @@ def update_nightly_index():
 def main():
     args = sys.argv[1:]
     if len(args) == 0:
-        print('Synchronizing channels')
+        print('Synchronizing stable channels')
         sync_stable_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
+        print('Synchronizing nightly channels')
+        sync_nightly_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
     elif len(args) == 2 and args[0] == 'stable':
         if args[1] == 'all':
             sync_stable_channel(stop_if_exists=False)
