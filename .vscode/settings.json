@@ -1,0 +1,8 @@
+{
+    "[nix]": {
+        "editor.tabSize": 2,
+        "files.trimFinalNewlines": true,
+        "files.insertFinalNewline": true,
+        "files.trimTrailingWhitespace": true
+    }
+}
