@@ -8,16 +8,21 @@ manifests:
 let
 
   # Manifest selector.
-  fromManifest = { channel }: { stdenv, fetchurl, patchelf }: let
-    inherit (builtins) match;
-    byVersion = match "([0-9]+\\.[0-9]+\\.[0-9]+)" channel != null;
+  fromManifest = { channel ? null, date ? null }: { stdenv, fetchurl, patchelf }: let
+    assertWith = cond: msg: body: if cond then body else throw msg;
 
-    manifest =
-      if channel == "stable" then manifests.stable.latest
-      else if byVersion then manifests.stable.${channel} or (throw "Version ${channel} is not available")
+    ret =
+      if channel == "stable" then
+        assertWith (date == null) "Stable version with specific date is not supported"
+          manifests.stable.latest
+      else if channel == "nightly" then
+        manifests.nightly.${if date != null then date else "latest"} or (throw "nightly ${date} is not available")
+      else if builtins.match "([0-9]+\\.[0-9]+\\.[0-9]+)" channel != null then
+        assertWith (date == null) "Stable version with specific date is not supported"
+          manifests.stable.${channel} or (throw "Stable ${channel} is not available")
       else throw "Unknown channel: ${channel}";
 
-  in fromManifestFile manifest { inherit stdenv fetchurl patchelf; };
+  in fromManifestFile ret { inherit stdenv fetchurl patchelf; };
 
   getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
     let

@@ -6,6 +6,7 @@ import re
 import string
 import sys
 import time
+import datetime
 from pathlib import Path
 
 import toml
@@ -16,8 +17,9 @@ RETRY_DELAY = 3.0
 SYNC_MAX_FETCH = 5
 
 MIN_STABLE_VERSION = '1.29.0'
+MIN_NIGHTLY_DATE = datetime.date.fromisoformat('2018-09-13')
 
-DIST_SERVER = 'https://static.rust-lang.org'
+DIST_ROOT = 'https://static.rust-lang.org/dist'
 NIX_KEYWORDS = {'', 'if', 'then', 'else', 'assert', 'with', 'let', 'in', 'rec', 'inherit', 'or'}
 MANIFEST_TMP_PATH = Path('manifest.tmp')
 TARGETS_PATH = Path('manifests/targets.nix')
@@ -76,7 +78,7 @@ def retry_with(f):
             print(e)
             time.sleep(RETRY_DELAY)
 
-def translate_dump_manifest(manifest: str, f):
+def translate_dump_manifest(manifest: str, f, nightly=False):
     manifest = toml.loads(manifest)
     date = manifest['date']
     version = manifest['pkg']['rustc']['version'].split()[0]
@@ -96,19 +98,26 @@ def translate_dump_manifest(manifest: str, f):
                 continue
             url = target['xz_url']
             target_tail = '' if target_name == '*' else '-' + target_name
-            start = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-'
+            start = f'{DIST_ROOT}/{date}/{pkg_name_stripped}-'
             end = f'{target_tail}.tar.xz'
+            # Occurs in nightly-2019-01-10. Maybe broken or hirarerchy change?
+            if url.startswith('nightly/'):
+                url = DIST_ROOT + url[7:]
             assert url.startswith(start) and url.endswith(end), f'Unexpected url: {url}'
             url_version = url[len(start):-len(end)]
 
-        if url_version == pkg['version'].split(' ')[0]:
+        if url_version == 'nightly':
+            assert nightly
+            url_version_kind = 0
+        elif url_version == pkg['version'].split(' ')[0]:
+            assert not nightly
             url_version_kind = 0
         elif url_version == pkg['version']:
             url_version_kind = 1
         elif url_version == version:
             url_version_kind = 2
         else:
-            assert False, f'Known url version `{url_version}` for `{pkg_name}`'
+            assert False, f'Unknow url version `{url_version}` for `{pkg_name}`'
 
         f.write(f'{pkg_name}={{')
         f.write(f'v={escape_nix_string(pkg["version"])};')
@@ -119,6 +128,9 @@ def translate_dump_manifest(manifest: str, f):
             if not target['available']:
                 continue
             url = target['xz_url']
+            # See above.
+            if url.startswith('nightly/'):
+                url = DIST_ROOT + url[7:]
             hash = to_base64(target['xz_hash']) # Hash must not contains quotes.
             target_tail = '' if target_name == '*' else '-' + target_name
             expect_url = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-{url_version}{target_tail}.tar.xz'
@@ -128,9 +140,10 @@ def translate_dump_manifest(manifest: str, f):
     f.write('}\n')
 
 def fetch_stable_manifest(version: str, out_path: Path):
+    out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix('.tmp')
-    print(f'Fetching {version}')
-    manifest = retry_with(lambda: requests.get(f'{DIST_SERVER}/dist/channel-rust-{version}.toml'))
+    print(f'Fetching stable {version}')
+    manifest = retry_with(lambda: requests.get(f'{DIST_ROOT}/channel-rust-{version}.toml'))
     manifest.raise_for_status()
     manifest = manifest.text
     MANIFEST_TMP_PATH.write_text(manifest)
@@ -191,30 +204,83 @@ def sync_stable_channel(*, stop_if_exists, max_fetch=None):
         assert max_fetch is None or processed <= max_fetch, 'Too many versions'
     update_stable_index()
 
-def init_sync_all():
-    sync_stable_channel(stop_if_exists=False)
+def fetch_nightly_manifest(date: str, out_path: Path):
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = out_path.with_suffix('.tmp')
+    print(f'Fetching nightly {date}')
+    manifest = retry_with(lambda: requests.get(f'{DIST_ROOT}/{date}/channel-rust-nightly.toml'))
+    if manifest.status_code == 404:
+        print(f'Not found, skipped')
+        return
+    manifest.raise_for_status()
+    manifest = manifest.text
+    MANIFEST_TMP_PATH.write_text(manifest)
+    with open(tmp_path, 'w') as fout:
+        translate_dump_manifest(manifest, fout, nightly=True)
+    tmp_path.rename(out_path)
+
+def sync_nightly_channel(*, stop_if_exists, max_fetch=None):
+    # Fetch the global nightly manifest to retrive the latest nightly version.
+    print('Fetching latest nightly version')
+    manifest = retry_with(lambda: requests.get(f'{DIST_ROOT}/channel-rust-nightly.toml'))
+    manifest.raise_for_status()
+    date = datetime.date.fromisoformat(toml.loads(manifest.text)['date'])
+    print(f'The latest nightly version is {date}')
+
+    processed = 0
+    date + datetime.timedelta(days=1)
+    while date > MIN_NIGHTLY_DATE:
+        date -= datetime.timedelta(days=1)
+        out_path = Path(f'manifests/nightly/{date.year}/{date.isoformat()}.nix')
+        if out_path.exists():
+            if not stop_if_exists:
+                continue
+            print('Stopped on existing version')
+            break
+        fetch_nightly_manifest(date.isoformat(), out_path)
+        processed += 1
+        assert max_fetch is None or processed <= max_fetch, 'Too many versions'
+    update_nightly_index()
+
+def update_nightly_index():
+    dir = Path('manifests/nightly')
+    dates = sorted(file.stem for file in dir.rglob('*.nix') if file.stem != 'default')
+    with open(str(dir / 'default.nix'), 'w') as f:
+        f.write('{\n')
+        for date in dates:
+            year = date.split('-')[0]
+            f.write(f'  {escape_nix_key(date)} = import ./{year}/{date}.nix;\n')
+        f.write(f'  latest = {escape_nix_string(dates[-1])};\n')
+        f.write('}\n')
 
 def main():
     args = sys.argv[1:]
     if len(args) == 0:
         print('Synchronizing channels')
         sync_stable_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
-    elif len(args) == 1:
-        if args[0] == 'all':
+    elif len(args) == 2 and args[0] == 'stable':
+        if args[1] == 'all':
             sync_stable_channel(stop_if_exists=False)
         else:
-            version = args[0]
+            version = args[1]
             assert RE_STABLE_VERSION.match(version), 'Invalid version'
             fetch_stable_manifest(version, Path(f'manifests/stable/{version}.nix'))
             update_stable_index()
+    elif len(args) == 2 and args[0] == 'nightly':
+        if args[1] == 'all':
+            sync_nightly_channel(stop_if_exists=False)
+        else:
+            date = datetime.date.fromisoformat(args[1])
+            fetch_nightly_manifest(date, Path(f'manifests/nightly/{date.year}/{date.isoformat()}.nix'))
+            update_nightly_index()
     else:
         print('''
 Usage:
     {0}
         Auto-sync new versions from channels.
-    {0} <version>
-        Force to fetch a specific version.
-    {0} all
+    {0} <channel> <version>
+        Force to fetch a specific version from a channel.
+    {0} <channel> all
         Force to fetch all versions.
 '''.format(sys.argv[0]))
         exit(1)

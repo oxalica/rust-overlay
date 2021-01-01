@@ -35,12 +35,15 @@
     defaultPackage = packages.rust-stable;
     packages = {
       rust-stable = pkgs.latest.rustChannels.stable.rust;
+      rust-nightly = pkgs.latest.rustChannels.nightly.rust;
     };
 
     checks = {
       kind2 = (pkgs.rustChannelOf { channel = "1.48.0"; }).rust;
       kind0 = (pkgs.rustChannelOf { channel = "1.47.0"; }).rust;
       kind1 = (pkgs.rustChannelOf { channel = "1.34.2"; }).llvm-tools-preview;
+      kind-nightly = (pkgs.rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rust;
+      url-fix = (pkgs.rustChannelOf { channel = "nightly"; date = "2019-01-10"; }).rust;
     };
   });
 }

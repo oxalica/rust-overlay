@@ -40,7 +40,7 @@ let
   };
 
   # version -> { pkgName = { _1 = "..."; } } -> { pkgName = { x86_64-unknown-linux-gnu = fetchurl { .. }; } }
-  uncompressManifest = version: { date, ... }@manifest: rec {
+  uncompressManifest = nightly: version: { date, ... }@manifest: rec {
     inherit date;
     pkg =
       mapAttrs (pkgName: { v, k ? 0, ... }@hashes: {
@@ -50,10 +50,12 @@ let
             target = targets.${targetIdx};
             pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
+            vHead = head (match "([^ ]*) .*" v);
             urlVersion =
-              if k == 0 then head (match "([^ ]*) .*" v) # '0.44.1 (aaaaaaaaa 2018-01-01)' -> '0.44.1' [package version]
-              else if k == 1 then v                      # '0.44.1 (aaaaaaaaa 2018-01-01)' [package version]
-              else if k == 2 then version                # '1.49.0' [stable toolchain version]
+              if nightly then "nightly"     # 'nightly'
+              else if k == 0 then vHead     # '0.44.1 (aaaaaaaaa 2018-01-01)' -> '0.44.1' [package version]
+              else if k == 1 then v         # '0.44.1 (aaaaaaaaa 2018-01-01)' [package version]
+              else if k == 2 then version   # '1.49.0' [stable toolchain version]
               else throw "Invalid k";
           in {
             name = target;
@@ -65,12 +67,13 @@ let
       }) (removeAttrs manifest ["date"]);
   };
 
-  uncompressManifestSet = set: let
-    ret = mapAttrs uncompressManifest (removeAttrs set ["latest"]);
+  uncompressManifestSet = nightly: set: let
+    ret = mapAttrs (uncompressManifest nightly) (removeAttrs set ["latest"]);
   in ret // { latest = ret.${set.latest}; };
 
   manifests = {
-    stable = uncompressManifestSet (import ./manifests/stable);
+    stable = uncompressManifestSet false (import ./manifests/stable);
+    nightly = uncompressManifestSet true (import ./manifests/nightly);
   };
 
 # in { inherit manifests; }
