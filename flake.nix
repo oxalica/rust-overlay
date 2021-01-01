@@ -36,5 +36,11 @@
     packages = {
       rust-stable = pkgs.latest.rustChannels.stable.rust;
     };
+
+    checks = {
+      kind2 = (pkgs.rustChannelOf { channel = "1.48.0"; }).rust;
+      kind0 = (pkgs.rustChannelOf { channel = "1.47.0"; }).rust;
+      kind1 = (pkgs.rustChannelOf { channel = "1.34.2"; }).llvm-tools-preview;
+    };
   });
 }

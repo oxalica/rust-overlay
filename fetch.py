@@ -15,7 +15,7 @@ MAX_TRIES = 3
 RETRY_DELAY = 3.0
 SYNC_MAX_FETCH = 5
 
-STABLE_VERSION_FILTER = lambda v: parse_version(v) >= (1, 29, 0)
+MIN_STABLE_VERSION = '1.29.0'
 
 DIST_SERVER = 'https://static.rust-lang.org'
 NIX_KEYWORDS = {'', 'if', 'then', 'else', 'assert', 'with', 'let', 'in', 'rec', 'inherit', 'or'}
@@ -89,7 +89,7 @@ def translate_dump_manifest(manifest: str, f):
         pkg_name_stripped = pkg_name[:-len(strip_tail)] if pkg_name.endswith(strip_tail) else pkg_name
         pkg_targets = sorted(pkg['target'].keys())
 
-        pkg_version = version
+        url_version = version
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
             if not target['available']:
@@ -99,10 +99,21 @@ def translate_dump_manifest(manifest: str, f):
             start = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-'
             end = f'{target_tail}.tar.xz'
             assert url.startswith(start) and url.endswith(end), f'Unexpected url: {url}'
-            pkg_version = url[len(start):-len(end)]
+            url_version = url[len(start):-len(end)]
+
+        if url_version == pkg['version'].split(' ')[0]:
+            url_version_kind = 0
+        elif url_version == pkg['version']:
+            url_version_kind = 1
+        elif url_version == version:
+            url_version_kind = 2
+        else:
+            assert False, f'Known url version `{url_version}` for `{pkg_name}`'
 
         f.write(f'{pkg_name}={{')
         f.write(f'v={escape_nix_string(pkg["version"])};')
+        if url_version_kind != 0:
+            f.write(f'k={url_version_kind};')
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
             if not target['available']:
@@ -110,7 +121,7 @@ def translate_dump_manifest(manifest: str, f):
             url = target['xz_url']
             hash = to_base64(target['xz_hash']) # Hash must not contains quotes.
             target_tail = '' if target_name == '*' else '-' + target_name
-            expect_url = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-{pkg_version}{target_tail}.tar.xz'
+            expect_url = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-{url_version}{target_tail}.tar.xz'
             assert url == expect_url, f'Unexpected url: {url}, expecting: {expect_url}'
             f.write(f'{compress_target(target_name)}="{hash}";')
         f.write('};')
@@ -142,35 +153,43 @@ def update_stable_index():
 
 def sync_stable_channel(*, stop_if_exists, max_fetch=None):
     GITHUB_RELEASES_URL = 'https://api.github.com/repos/rust-lang/rust/releases'
+    PER_PAGE = 100
 
+    versions = []
     page = 0
-    count = 0
-    try:
-        while True:
-            page += 1
-            print(f'Fetching release page {page}')
-            release_page = retry_with(lambda: requests.get(GITHUB_RELEASES_URL, params={'page': page}))
-            release_page.raise_for_status()
-            release_page = release_page.json()
-            if not release_page:
-                return
-            for release in release_page:
-                version = release['tag_name']
-                if not RE_STABLE_VERSION.match(version) or not STABLE_VERSION_FILTER(version):
-                    continue
-                out_path = Path(f'manifests/stable/{version}.nix')
-                if out_path.exists():
-                    if stop_if_exists:
-                        print('Stopped on existing version')
-                        return
-                    continue
-                fetch_stable_manifest(version, out_path)
-                count += 1
-                if max_fetch is not None and count >= max_fetch:
-                    print('Reached max fetch count')
-                    exit(1)
-    finally:
-        update_stable_index()
+    while True:
+        page += 1
+        print(f'Fetching release page {page}')
+        release_page = retry_with(lambda: requests.get(
+            GITHUB_RELEASES_URL,
+            params={'per_page': PER_PAGE, 'page': page},
+        ))
+        release_page.raise_for_status()
+        release_page = release_page.json()
+        versions.extend(
+            tag['tag_name']
+            for tag in release_page
+            if RE_STABLE_VERSION.match(tag['tag_name'])
+            and not version_less(tag['tag_name'], MIN_STABLE_VERSION)
+        )
+        if len(release_page) < PER_PAGE:
+            break
+    versions.sort(key=parse_version, reverse=True)
+
+    print(f'Got {len(release_page)} releases to fetch')
+
+    processed = 0
+    for version in versions:
+        out_path = Path(f'manifests/stable/{version}.nix')
+        if out_path.exists():
+            if not stop_if_exists:
+                continue
+            print('Stopped on existing version')
+            break
+        fetch_stable_manifest(version, out_path)
+        processed += 1
+        assert max_fetch is None or processed <= max_fetch, 'Too many versions'
+    update_stable_index()
 
 def init_sync_all():
     sync_stable_channel(stop_if_exists=False)
@@ -181,16 +200,23 @@ def main():
         print('Synchronizing channels')
         sync_stable_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
     elif len(args) == 1:
-        version = args[0]
-        assert RE_STABLE_VERSION.match(version), 'Invalid version'
-        fetch_stable_manifest(version, Path(f'manifests/stable/{version}.nix'))
-        update_stable_index()
+        if args[0] == 'all':
+            sync_stable_channel(stop_if_exists=False)
+        else:
+            version = args[0]
+            assert RE_STABLE_VERSION.match(version), 'Invalid version'
+            fetch_stable_manifest(version, Path(f'manifests/stable/{version}.nix'))
+            update_stable_index()
     else:
-        print(f'''
-Usage: {sys.argv[0]} [version]
-    Run without arguments to auto-sync new versions from channels.
-    Run with version to fetch a specific version.
-''')
+        print('''
+Usage:
+    {0}
+        Auto-sync new versions from channels.
+    {0} <version>
+        Force to fetch a specific version.
+    {0} all
+        Force to fetch all versions.
+'''.format(sys.argv[0]))
         exit(1)
 
 if __name__ == '__main__':

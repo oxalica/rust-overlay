@@ -64,10 +64,15 @@ let
 
   getFetchUrl = pkgs: pkgname: target: stdenv: fetchurl:
     let
+      inherit (builtins) match elemAt;
       pkg = pkgs.${pkgname};
       srcInfo = pkg.target.${target};
+      url = builtins.replaceStrings [" "] ["%20"] srcInfo.xz_url; # This is required or download will fail.
+      # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
+      matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" srcInfo.xz_url;
+      name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-      (super.fetchurl { url = srcInfo.xz_url; sha256 = srcInfo.xz_hash; });
+      (super.fetchurl { inherit name url; sha256 = srcInfo.xz_hash; });
 
   checkMissingExtensions = pkgs: pkgname: stdenv: extensions:
     let

@@ -1,7 +1,7 @@
 final: prev:
+with (prev.lib);
+with builtins;
 let
-  inherit (prev.lib) filter hasAttr attrNames mapAttrs concatMap mapAttrs' replaceStrings;
-
   targets = import ./manifests/targets.nix // { _ = "*"; };
 
   distServer = "https://static.rust-lang.org";
@@ -43,20 +43,25 @@ let
   uncompressManifest = version: { date, ... }@manifest: rec {
     inherit date;
     pkg =
-      mapAttrs (pkgName: { v, ... }@hashes: {
+      mapAttrs (pkgName: { v, k ? 0, ... }@hashes: {
         version = v;
         target =
           mapAttrs' (targetIdx: hash: let
             target = targets.${targetIdx};
-            pkgNameStripped = replaceStrings ["-preview"] [""] pkgName;
+            pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
+            urlVersion =
+              if k == 0 then head (match "([^ ]*) .*" v) # '0.44.1 (aaaaaaaaa 2018-01-01)' -> '0.44.1' [package version]
+              else if k == 1 then v                      # '0.44.1 (aaaaaaaaa 2018-01-01)' [package version]
+              else if k == 2 then version                # '1.49.0' [stable toolchain version]
+              else throw "Invalid k";
           in {
             name = target;
             value = {
-              xz_url = "${distServer}/dist/${date}/${pkgNameStripped}-${version}${targetTail}.tar.xz";
+              xz_url = "${distServer}/dist/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
-          }) (removeAttrs hashes ["v"]);
+          }) (removeAttrs hashes ["v" "k"]);
       }) (removeAttrs manifest ["date"]);
   };
 
