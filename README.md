@@ -1,40 +1,53 @@
 # rust-overlay
 
 *Pure and reproducible* overlay for binary distributed rust toolchains.
-A better replacement for github:mozilla/nixpkgs-mozilla
+A compatible but better replacement for rust overlay of [github:mozilla/nixpkgs-mozilla][mozilla].
 
-Hashes of toolchain components are pre-fetched (and compressed) in `manifests` directory.
-So there's no need to have network access during nix evaluation (but nixpkgs-mozilla does).
+Hashes of toolchain components are pre-fetched (and compressed) in tree (`manifests` directory),
+so the evaluation is *pure* and no need to have network (but [nixpkgs-mozilla][mozilla] does).
+It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
 
-Since the evaluation is now *pure*, it also means this can work well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
-
-- [ ] Auto-updating is TODO.
+- The toolchain hashes are auto-updated daily using GitHub Actions.
 - Current oldest supported version is stable 1.29.0 and nightly 2018-09-13
   (which is randomly chosen).
 
-## Use as classical nix overlay
-
-The installaction and usage are exactly the same as nixpkgs-mozilla.
-You can follow https://github.com/mozilla/nixpkgs-mozilla#rust-overlay and just replace the url to
-https://github.com/oxalica/rust-overlay
+## Use as a classic Nix overlay
 
 You can put the code below into your `~/.config/nixpkgs/overlays.nix`.
 ```nix
-[ (import (builtins.fetchTarball https://github.com/oxalica/rust-overlay/archive/master.tar.gz)) ]
+[ (import (builtins.fetchTarball "https://github.com/oxalica/rust-overlay/archive/master.tar.gz")) ]
+```
+Then the provided attribute paths are available in nix command.
+```bash
+$ nix-env -iA rust-bin.stable.latest.rust # Do anything you like.
 ```
 
-Or install it into `nix-channel`:
-```shell
+Alternatively, you can install it into nix channels.
+```bash
 $ nix-channel --add https://github.com/oxalica/rust-overlay/archive/master.tar.gz rust-overlay
+$ nix-channel --update
 ```
 And then feel free to use it anywhere like
-`import <nixpkgs> { overlays = [ (import <rust-overlay>) ] }` in your nix shell environment
+`import <nixpkgs> { overlays = [ (import <rust-overlay>) ]; }` in your nix shell environment.
 
 ## Use with Nix Flakes
 
-This repository already has flake support. So you can simply use it as input.
-Here's an example of using it in nixos configuration.
+This repository already has flake support.
 
+NOTE: **Only the output `overlay` is stable and preferred to be used in your flake.**
+Other outputs like `packages` and `defaultPackage` are for human try and are subject to change.
+
+For a quick play, just use `nix shell` to bring the latest stable rust toolchain into scope.
+(All commands below requires preview version of Nix with flake support.)
+```shell
+$ nix shell github:oxalica/rust-overlay
+$ rustc --version
+rustc 1.49.0 (e1884a8e3 2020-12-29)
+$ cargo --version
+cargo 1.49.0 (d00d64df9 2020-12-05)
+```
+
+Here's an example of using it in nixos configuration.
 ```nix
 {
   description = "My configuration";
@@ -52,7 +65,7 @@ Here's an example of using it in nixos configuration.
           ./configuration.nix # Your system configuration.
           ({ pkgs, ... }: {
             nixpkgs.overlays = [ rust-overlay.overlay ];
-            environment.systemPackages = [ pkgs.latest.rustChannels.stable.rust ];
+            environment.systemPackages = [ pkgs.rust-bin.stable.latest.rust ];
           })
         ];
       };
@@ -61,31 +74,72 @@ Here's an example of using it in nixos configuration.
 }
 ```
 
-## Interface
+## Attributes provided by the overlay
 
-The overlay re-use many codes from nixpkgs/mozilla and the interface is **almost the same**.
-It provides `latest.rustChannels.{stable,nightly}.<toolchain-component>` and `rustChannelOf`.
-
-To use the latest stable or nightly rust toolchain, the easiest way is just to install
-`latest.rustChannels.{stable,nightly}.rust`, which combines `rustc`, `cargo`, `rustfmt` and
-all other default components.
-
-You can also pin to specific nightly toolchain using `rustChannelOf`:
 ```nix
-(nixpkgs.rustChannelOf { date = "2020-01-01"; channel = "nightly"; }).rust
-```
+{
+  rust-bin = {
+    # The default dist url for fetching.
+    # Override it if you want to use a mirror server.
+    distRoot = "https://static.rust-lang.org/dist";
 
-Customize an toolchain.
-```nix
-nixpkgs.latest.rustChannels.stable.rust.override {
-  extensions = [
-    "rust-src"
-  ];
-  targets = [
-    "x86_64-unknown-linux-musl"
-    "arm-unknown-linux-gnueabihf"
-  ];
+    stable = {
+      # The latest stable toolchain.
+      latest = {
+        # Aggregate all default components. (recommended)
+        rust = «derivation»;
+        # Individial components.
+        rustc = «derivation»;
+        cargo = «derivation»;
+        rust-std = «derivation»;
+        # ... other components
+      };
+      "1.49.0" = { /* toolchain */ };
+      "1.48.0" = { /* toolchain */ };
+      # ... other versions.
+    };
+
+    nightly = {
+      # The latest nightly toolchain.
+      latest = { /* toolchain */ };
+      "2020-12-31" = { /* toolchain */ };
+      "2020-12-30" = { /* toolchain */ };
+      # ... other versions.
+    };
+
+    # ... Some internal attributes omitted.
+  };
+
+  # These are for compatibility with nixpkgs-mozilla and
+  # provide same toolchains as `rust-bin.*`.
+  latest.rustChannels = /* ... */;
+  rustChannelOf = /* ... */;
+  rustChannelOfTargets = /* ... */;
+  rustChannels = /* ... */;
 }
 ```
 
-For more details, see `./rust-overlay.nix` or README of https://github.com/mozilla/nixpkgs-mozilla.
+Some examples (assume `nixpkgs` had the overlay applied):
+
+- Latest stable rust with all default components:
+  `nixpkgs.rust-bin.stable.latest.rust`
+- Latest nightly rust with all default components:
+  `nixpkgs.rust-bin.nightly.latest.rust`
+- A specific version of stable rust:
+  `nixpkgs.rust-bin.stable."1.48.0".rust`
+- A specific date of nightly rust:
+  `nixpkgs.rust-bin.nightly."2020-12-31".rust`
+- Latest stable rust with additional component `rust-src` and extra target
+  `arm-unknown-linux-gnueabihf`:
+
+  ```nix
+  nixpkgs.rust-bin.stable.latest.rust.override {
+    extensions = [ "rust-src" ];
+    targets = [ "arm-unknown-linux-gnueabihf" ];
+  }
+  ```
+
+For detail about `override` , see the source code of `./rust-overlay.nix`,
+or README of [nixpkgs-mozilla][mozilla].
+
+[mozilla]: https://github.com/mozilla/nixpkgs-mozilla
