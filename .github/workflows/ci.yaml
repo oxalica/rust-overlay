@@ -1,0 +1,47 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches:
+    - master
+    - ci
+
+jobs:
+  check-flake:
+    name: Check flake
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Nix Flakes doesn't work on shallow clones
+    - name: Install Nix (flakes, nixos-unstable)
+      uses: cachix/install-nix-action@v12
+      with:
+        install_url: https://github.com/numtide/nix-flakes-installer/releases/download/nix-2.4pre20201221_9fab14a/install
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Check flake
+      # Building checks is too slow.
+      run: nix flake check -v --show-trace --no-build --no-update-lock-file
+
+  check-build-stable:
+    name: Check build the latest stable Rust
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        fetch-depth: 0 # Nix Flakes doesn't work on shallow clones
+    - name: Install Nix (flakes, nixos-unstable)
+      uses: cachix/install-nix-action@v12
+      with:
+        install_url: https://github.com/numtide/nix-flakes-installer/releases/download/nix-2.4pre20201221_9fab14a/install
+        extra_nix_config: |
+          experimental-features = nix-command flakes
+        nix_path: nixpkgs=channel:nixos-unstable
+    - name: Build
+      run: |
+        nix build ".#rust" -L
+        ./result/bin/rustc --version
