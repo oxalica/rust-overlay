@@ -1,0 +1,53 @@
+name: sync-channels
+on:
+  schedule:
+  # The nightly channel is usually updated at 01:00:00 UTC.
+  - cron: '0 2 * * *' # *-*-* 02:00:00 UTC
+
+  push:
+    branches:
+    - trigger-sync
+
+jobs:
+  sync-channels:
+    name: Sync channels and prefetch toolchains
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        ref: master
+        persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+    - name: Install python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install python dependencies
+      run: pip3 install toml requests
+    - name: Install Nix
+      uses: cachix/install-nix-action@v12
+    - name: Sync channels
+      timeout-minutes: 5
+      run: python3 ./fetch.py
+    - name: Commit changes
+      id: commit
+      continue-on-error: true
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add manifests
+        git commit -m "manifest: update"
+    - name: Validate nix files changed
+      if: steps.commit.outcome == 'success'
+      run: |
+        files=( $(git diff --name-only HEAD HEAD^ '*.nix') )
+        echo "${#files[*]} nix files changed: ${files[*]}"
+        if [[ "${#files[*]}" -ne 0 ]]; then
+          nix-instantiate --parse "${files[@]}" >/dev/null
+        fi
+    - name: Push changes
+      if: steps.commit.outcome == 'success'
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: master
