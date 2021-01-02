@@ -1,7 +1,10 @@
 # rust-overlay
 
+![CI](https://github.com/oxalica/rust-overlay/workflows/CI/badge.svg)
+![sync-channels](https://github.com/oxalica/rust-overlay/workflows/sync-channels/badge.svg)
+
 *Pure and reproducible* overlay for binary distributed rust toolchains.
-A compatible but better replacement for rust overlay of [github:mozilla/nixpkgs-mozilla][mozilla].
+A compatible but better replacement for rust overlay of [mozilla/nixpkgs-mozilla][mozilla].
 
 Hashes of toolchain components are pre-fetched (and compressed) in tree (`manifests` directory),
 so the evaluation is *pure* and no need to have network (but [nixpkgs-mozilla][mozilla] does).
