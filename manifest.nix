@@ -4,7 +4,7 @@ with builtins;
 let
   targets = import ./manifests/targets.nix // { _ = "*"; };
 
-  distServer = "https://static.rust-lang.org";
+  inherit (final.rust-bin) distRoot;
 
   # Extensions for mixed `rust` pkg.
   components = [
@@ -60,7 +60,7 @@ let
           in {
             name = target;
             value = {
-              xz_url = "${distServer}/dist/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
+              xz_url = "${distRoot}/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
           }) (removeAttrs hashes ["v" "k"]);
@@ -71,10 +71,16 @@ let
     ret = mapAttrs (uncompressManifest nightly) (removeAttrs set ["latest"]);
   in ret // { latest = ret.${set.latest}; };
 
-  manifests = {
-    stable = uncompressManifestSet false (import ./manifests/stable);
-    nightly = uncompressManifestSet true (import ./manifests/nightly);
-  };
+in {
+  rust-bin = (prev.rust-bin or {}) // {
+    # The dist url for fetching.
+    # Override it if you want to use a mirror server.
+    distRoot = "https://static.rust-lang.org/dist";
 
-# in { inherit manifests; }
-in import ./rust-overlay.nix final prev manifests
+    # For internal usage.
+    manifests = {
+      stable = uncompressManifestSet false (import ./manifests/stable);
+      nightly = uncompressManifestSet true (import ./manifests/nightly);
+    };
+  };
+}

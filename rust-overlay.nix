@@ -3,12 +3,12 @@
 # This file provide a Rust overlay, which provides pre-packaged bleeding edge versions of rustc
 # and cargo.
 self: super:
-manifests:
 
 let
 
   # Manifest selector.
   fromManifest = { channel ? null, date ? null }: { stdenv, fetchurl, patchelf }: let
+    inherit (self.rust-bin) manifests;
     assertWith = cond: msg: body: if cond then body else throw msg;
 
     ret =
@@ -269,43 +269,53 @@ let
 in
 
 rec {
+  # For each channel:
+  #   rust-bin.stable.latest.cargo
+  #   rust-bin.stable.latest.rust   # Aggregate all others. (recommended)
+  #   rust-bin.stable.latest.rustc
+  #   rust-bin.stable.latest.rust-analysis
+  #   rust-bin.stable.latest.rust-docs
+  #   rust-bin.stable.latest.rust-src
+  #   rust-bin.stable.latest.rust-std
+  #
+  # For a specific version of stable:
+  #   rust-bin.stable."1.47.0".rust
+  #
+  # For a specific date of nightly:
+  #   rust-bin.nightly."2020-01-01".rust
+  rust-bin = with builtins; (super.rust-bin or {}) //
+    mapAttrs (channel: manifests:
+      mapAttrs (version: manifest:
+        fromManifestFile manifest { inherit (self) stdenv fetchurl patchelf; }
+      ) manifests
+    ) super.rust-bin.manifests;
+
+  # Compat with mozilla overlay.
   lib = super.lib // {
-    rustLib = {
+    rustLib = super.lib.rustLib {
       inherit fromManifest fromManifestFile;
     };
   };
 
+  # Compat with mozilla overlay.
   rustChannelOf = manifest_args: fromManifest
     manifest_args
     { inherit (self) stdenv fetchurl patchelf; };
 
-  # Set of packages which are automagically updated. Do not rely on these for
-  # reproducible builds.
+  # Compat with mozilla overlay.
   latest = (super.latest or {}) // {
     rustChannels = {
       nightly = rustChannelOf { channel = "nightly"; };
-      beta    = rustChannelOf { channel = "beta"; };
+      # beta    = rustChannelOf { channel = "beta"; };
       stable  = rustChannelOf { channel = "stable"; };
     };
   };
 
-  # Helper builder
+  # Compat with mozilla overlay.
   rustChannelOfTargets = channel: date: targets:
     (rustChannelOf { inherit channel date; })
       .rust.override { inherit targets; };
 
-  # For backward compatibility
+  # Compat with mozilla overlay.
   rustChannels = latest.rustChannels;
-
-  # For each channel:
-  #   latest.rustChannels.nightly.cargo
-  #   latest.rustChannels.nightly.rust   # Aggregate all others. (recommended)
-  #   latest.rustChannels.nightly.rustc
-  #   latest.rustChannels.nightly.rust-analysis
-  #   latest.rustChannels.nightly.rust-docs
-  #   latest.rustChannels.nightly.rust-src
-  #   latest.rustChannels.nightly.rust-std
-
-  # For a specific date:
-  #   (rustChannelOf { date = "2017-06-06"; channel = "beta"; }).rust
 }
