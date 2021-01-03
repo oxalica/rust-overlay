@@ -101,11 +101,12 @@ def retry_with(f):
 def translate_dump_manifest(manifest: str, f, nightly=False):
     manifest = toml.loads(manifest)
     date = manifest['date']
-    version = manifest['pkg']['rustc']['version'].split()[0]
+    rustc_version = manifest['pkg']['rustc']['version'].split()[0]
     renames_idx = compress_renames(manifest['renames'])
     strip_tail = '-preview'
 
     f.write('{')
+    f.write(f'v={escape_nix_string(rustc_version)};')
     f.write(f'd={escape_nix_string(date)};')
     f.write(f'r={renames_idx};')
     for pkg_name in sorted(manifest['pkg'].keys()):
@@ -113,7 +114,7 @@ def translate_dump_manifest(manifest: str, f, nightly=False):
         pkg_name_stripped = pkg_name[:-len(strip_tail)] if pkg_name.endswith(strip_tail) else pkg_name
         pkg_targets = sorted(pkg['target'].keys())
 
-        url_version = version
+        url_version = rustc_version
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
             if not target['available']:
@@ -128,23 +129,9 @@ def translate_dump_manifest(manifest: str, f, nightly=False):
             assert url.startswith(start) and url.endswith(end), f'Unexpected url: {url}'
             url_version = url[len(start):-len(end)]
 
-        if url_version == 'nightly':
-            assert nightly
-            url_version_kind = 0
-        elif url_version == pkg['version'].split(' ')[0]:
-            assert not nightly
-            url_version_kind = 0
-        elif url_version == pkg['version']:
-            url_version_kind = 1
-        elif url_version == version:
-            url_version_kind = 2
-        else:
-            assert False, f'Unknow url version `{url_version}` for `{pkg_name}`'
-
         f.write(f'{pkg_name}={{')
-        f.write(f'v={escape_nix_string(pkg["version"])};')
-        if url_version_kind != 0:
-            f.write(f'k={url_version_kind};')
+        if not (url_version == rustc_version or (url_version == 'nightly' and nightly)):
+            f.write(f'u={escape_nix_string(url_version)};')
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
             if not target['available']:

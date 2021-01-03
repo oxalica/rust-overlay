@@ -262,8 +262,11 @@ let
     mkPackage = name: pkg:
       makeOverridable ({ extensions, targets, targetExtensions, stdenv, fetchurl, patchelf }:
         let
-          version' = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
-          version = if version' == null then pkg.version else "${elemAt version' 0}-${elemAt version' 2}-${elemAt version' 1}";
+          m = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
+          version =
+            if m == null then pkg.version
+            else if builtins.match ".*nightly.*" pkg.version != null then "nightly-${elemAt m 2}"
+            else elemAt m 0;
           extensions' = map maybeRename extensions;
           targetExtensions' = map maybeRename targetExtensions;
           namesAndSrcs = getComponents pkgs.pkg name targets extensions' targetExtensions' stdenv fetchurl;
@@ -272,6 +275,9 @@ let
         in
           super.pkgs.symlinkJoin {
             name = name + "-" + version;
+            pname = name;
+            inherit version;
+
             paths = components;
             postBuild = ''
               # If rustc or rustdoc is in the derivation, we need to copy their
