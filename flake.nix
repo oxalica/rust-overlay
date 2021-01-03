@@ -55,21 +55,26 @@
       inherit (pkgs) rust-bin rustChannelOf;
       inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable nightly;
 
+      rustTarget = pkgs.rust.toRustTarget pkgs.hostPlatform;
+
       assertEq = lhs: rhs: {
         assertion = lhs == rhs;
         message = "`${lhs}` != `${rhs}`";
       };
-      assertUrl = drv: url: {
-        assertion = true;
-        message = "TODO";
-      };
+      assertUrl = drv: url: let
+        srcUrl = lib.head (lib.head drv.paths).src.urls;
+      in assertEq srcUrl url;
 
       assertions = {
-        # url-kind-2 = assertUrl stable."1.48.0".rust "";
-        # url-kind-0 = assertUrl stable."1.47.0".rust "";
-        # url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "";
-        # url-kind-nightly = assertUrl nightly."2021-01-01".rust "";
-        # url-fix = assertUrl nightly."2019-01-10".rust "";
+        url-no-arch = assertUrl stable."1.48.0".rust-src "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
+        url-kind-2 = assertUrl stable."1.48.0".cargo "https://static.rust-lang.org/dist/2020-11-19/cargo-1.48.0-${rustTarget}.tar.xz";
+        url-kind-0 = assertUrl stable."1.47.0".cargo "https://static.rust-lang.org/dist/2020-10-08/cargo-0.48.0-${rustTarget}.tar.xz";
+        url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustTarget}.tar.xz";
+        url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustTarget}.tar.xz";
+        url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustTarget}.tar.xz";
+
+        latest-stable = assertEq pkgs.latest.rustChannels.stable.rust stable.latest.rust;
+        latest-nightly = assertEq pkgs.latest.rustChannels.nightly.rust nightly.latest.rust;
 
         rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rust stable.latest.rust;
         rust-channel-of-nightly = assertEq (rustChannelOf { channel = "nightly"; }).rust nightly.latest.rust;
@@ -101,11 +106,17 @@
 
       checkDrvs = {};
 
-    in lib.foldl'
-      (v: name: if assertions.${name}.assertion
-        then v
-        else throw "Assertion `${name}` failed: ${assertions.${name}.message}")
-      checkDrvs
-      (lib.attrNames assertions);
+      failedAssertions =
+        lib.filter (msg: msg != null) (
+          lib.mapAttrsToList
+          (name: { assertion, message }: if assertion
+            then null
+            else "Assertion `${name}` failed: ${message}\n")
+          assertions);
+
+    in if failedAssertions == []
+      then checkDrvs
+      else throw (builtins.toString failedAssertions);
+
   });
 }
