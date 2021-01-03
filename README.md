@@ -86,6 +86,12 @@ Here's an example of using it in nixos configuration.
     # Override it if you want to use a mirror server.
     distRoot = "https://static.rust-lang.org/dist";
 
+    # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
+    # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+    fromRustupToolchain = { channel, components ? [], targets ? [] }: «derivation»;
+    # Same as `fromRustupToolchain` but read from a `rust-toolchain` TOML file.
+    fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
+
     stable = {
       # The latest stable toolchain.
       latest = {

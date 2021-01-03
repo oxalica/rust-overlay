@@ -7,22 +7,42 @@ self: super:
 let
 
   # Manifest selector.
-  fromManifest = { channel ? null, date ? null }: { stdenv, fetchurl, patchelf }: let
+  fromManifest = { channel, date ? null }: { stdenv, fetchurl, patchelf }: let
     inherit (self.rust-bin) manifests;
+    inherit (builtins) match elemAt;
+
     assertWith = cond: msg: body: if cond then body else throw msg;
+
+    asVersion = match "[0-9]+\\.[0-9]+\\.[0-9]+" channel;
+    asNightlyDate = let m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel; in
+      if m == null then null else elemAt m 0;
 
     ret =
       if channel == "stable" then
         assertWith (date == null) "Stable version with specific date is not supported"
           manifests.stable.latest
       else if channel == "nightly" then
-        manifests.nightly.${if date != null then date else "latest"} or (throw "nightly ${date} is not available")
-      else if builtins.match "([0-9]+\\.[0-9]+\\.[0-9]+)" channel != null then
+        manifests.nightly.${if date != null then date else "latest"} or (throw "Nightly ${date} is not available")
+      else if channel == "beta" then
+        throw "Beta channel is not supported yet"
+      else if asVersion != null then
         assertWith (date == null) "Stable version with specific date is not supported"
           manifests.stable.${channel} or (throw "Stable ${channel} is not available")
+      else if asNightlyDate != null then
+        assertWith (date == null) "Cannot specify date in both `channel` and `date`"
+          manifests.nightly.${asNightlyDate} or (throw "Nightly ${asNightlyDate} is not available")
       else throw "Unknown channel: ${channel}";
 
   in fromManifestFile ret { inherit stdenv fetchurl patchelf; };
+
+  # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
+  # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+  fromRustupToolchain = { channel, components ? [], targets ? [] }:
+    (fromManifest { inherit channel; } { inherit (self) stdenv fetchurl patchelf; }
+    ).rust.override {
+      extensions = components;
+      inherit targets;
+    };
 
   getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
     let
@@ -283,12 +303,17 @@ rec {
   #
   # For a specific date of nightly:
   #   rust-bin.nightly."2020-01-01".rust
-  rust-bin = with builtins; (super.rust-bin or {}) //
+  rust-bin = with builtins;
+    (super.rust-bin or {}) //
     mapAttrs (channel: manifests:
       mapAttrs (version: manifest:
         fromManifestFile manifest { inherit (self) stdenv fetchurl patchelf; }
       ) manifests
-    ) super.rust-bin.manifests;
+    ) super.rust-bin.manifests //
+    {
+      fromRustupToolchainFile = path: fromRustupToolchain (fromTOML (readFile path)).toolchain;
+      inherit fromRustupToolchain;
+    };
 
   # Compat with mozilla overlay.
   lib = super.lib // {
