@@ -3,6 +3,7 @@ with (prev.lib);
 with builtins;
 let
   targets = import ./manifests/targets.nix // { _ = "*"; };
+  renamesList = import ./manifests/renames.nix;
 
   inherit (final.rust-bin) distRoot;
 
@@ -39,11 +40,13 @@ let
     extensions = singleTargetTups ++ multiTargetTups;
   };
 
-  # version -> { pkgName = { _1 = "..."; } } -> { pkgName = { x86_64-unknown-linux-gnu = fetchurl { .. }; } }
-  uncompressManifest = nightly: version: { date, ... }@manifest: rec {
+  # Uncompress the compressed manifest to the original one
+  # (not complete but has enough information to make up the toolchain).
+  uncompressManifest = nightly: version: { date /* date */, r /* rename index */, ... }@manifest: rec {
     inherit date;
+    renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
     pkg =
-      mapAttrs (pkgName: { v, k ? 0, ... }@hashes: {
+      mapAttrs (pkgName: { v /* pkg version */, k ? 0 /* url kind */, ... }@hashes: {
         version = v;
         target =
           mapAttrs' (targetIdx: hash: let
@@ -64,7 +67,7 @@ let
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
           }) (removeAttrs hashes ["v" "k"]);
-      }) (removeAttrs manifest ["date"]);
+      }) (removeAttrs manifest ["date" "r"]);
   };
 
   uncompressManifestSet = nightly: set: let

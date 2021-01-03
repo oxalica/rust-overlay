@@ -73,6 +73,12 @@
         url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustTarget}.tar.xz";
         url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustTarget}.tar.xz";
 
+        rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
+        rename-unavailable = {
+          assertion = !(stable."1.30.0" ? rustfmt);
+          message = "1.30.0 has rustfmt still in preview state";
+        };
+
         latest-stable = assertEq pkgs.latest.rustChannels.stable.rust stable.latest.rust;
         latest-nightly = assertEq pkgs.latest.rustChannels.nightly.rust nightly.latest.rust;
 
@@ -88,19 +94,18 @@
         rustup-toolchain-customization = assertEq
           (fromRustupToolchain {
             channel = "1.48.0";
-            # FIXME: Handle renames `rustfmt` -> `rustfmt-preview`.
-            components = [ "rustfmt-preview" "rustc-dev" ];
+            components = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           })
           (stable."1.48.0".rust.override {
-            extensions = [ "rustfmt-preview" "rustc-dev" ];
+            extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
 
         rustup-toolchain-file-toml = assertEq
           (fromRustupToolchainFile ./tests/rust-toolchain-toml)
           (nightly."2020-07-10".rust.override {
-            extensions = [ "rustfmt-preview" "rustc-dev" ];
+            extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
         rustup-toolchain-file-legacy = assertEq
