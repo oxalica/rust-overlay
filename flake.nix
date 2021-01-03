@@ -51,12 +51,61 @@
         rust = packages.rust-latest;
       };
 
-    checks = {
-      kind2 = (pkgs.rustChannelOf { channel = "1.48.0"; }).rust;
-      kind0 = (pkgs.rustChannelOf { channel = "1.47.0"; }).rust;
-      kind1 = (pkgs.rustChannelOf { channel = "1.34.2"; }).llvm-tools-preview;
-      kind-nightly = (pkgs.rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rust;
-      url-fix = (pkgs.rustChannelOf { channel = "nightly"; date = "2019-01-10"; }).rust;
-    };
+    checks = let
+      inherit (pkgs) rust-bin rustChannelOf;
+      inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable nightly;
+
+      assertEq = lhs: rhs: {
+        assertion = lhs == rhs;
+        message = "`${lhs}` != `${rhs}`";
+      };
+      assertUrl = drv: url: {
+        assertion = true;
+        message = "TODO";
+      };
+
+      assertions = {
+        # url-kind-2 = assertUrl stable."1.48.0".rust "";
+        # url-kind-0 = assertUrl stable."1.47.0".rust "";
+        # url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "";
+        # url-kind-nightly = assertUrl nightly."2021-01-01".rust "";
+        # url-fix = assertUrl nightly."2019-01-10".rust "";
+
+        rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rust stable.latest.rust;
+        rust-channel-of-nightly = assertEq (rustChannelOf { channel = "nightly"; }).rust nightly.latest.rust;
+        rust-channel-of-version = assertEq (rustChannelOf { channel = "1.48.0"; }).rust stable."1.48.0".rust;
+        rust-channel-of-nightly-date = assertEq (rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rust nightly."2021-01-01".rust;
+
+        rustup-toolchain-stable = assertEq (fromRustupToolchain { channel = "stable"; }) stable.latest.rust;
+        rustup-toolchain-nightly = assertEq (fromRustupToolchain { channel = "nightly"; }) nightly.latest.rust;
+        rustup-toolchain-version = assertEq (fromRustupToolchain { channel = "1.48.0"; }) stable."1.48.0".rust;
+        rustup-toolchain-nightly-date = assertEq (fromRustupToolchain { channel = "nightly-2021-01-01"; }) nightly."2021-01-01".rust;
+        rustup-toolchain-customization = assertEq
+          (fromRustupToolchain {
+            channel = "1.48.0";
+            # FIXME: Handle renames `rustfmt` -> `rustfmt-preview`.
+            components = [ "rustfmt-preview" "rustc-dev" ];
+            targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
+          })
+          (stable."1.48.0".rust.override {
+            extensions = [ "rustfmt-preview" "rustc-dev" ];
+            targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
+          });
+        rustup-toolchain-customization-file = assertEq
+          (fromRustupToolchainFile ./tests/rust-toolchain)
+          (nightly."2020-07-10".rust.override {
+            extensions = [ "rustfmt-preview" "rustc-dev" ];
+            targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
+          });
+      };
+
+      checkDrvs = {};
+
+    in lib.foldl'
+      (v: name: if assertions.${name}.assertion
+        then v
+        else throw "Assertion `${name}` failed: ${assertions.${name}.message}")
+      checkDrvs
+      (lib.attrNames assertions);
   });
 }

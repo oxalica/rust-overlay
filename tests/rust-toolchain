@@ -1,0 +1,4 @@
+[toolchain]
+channel = "nightly-2020-07-10"
+components = [ "rustfmt-preview", "rustc-dev" ]
+targets = [ "wasm32-unknown-unknown", "aarch64-unknown-linux-gnu" ]
