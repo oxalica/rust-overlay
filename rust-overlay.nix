@@ -7,7 +7,7 @@ self: super:
 let
 
   # Manifest selector.
-  fromManifest = { channel, date ? null }: { stdenv, fetchurl, patchelf }: let
+  selectManifest = { channel, date ? null }: let
     inherit (self.rust-bin) manifests;
     inherit (builtins) match elemAt;
 
@@ -17,29 +17,26 @@ let
     asNightlyDate = let m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel; in
       if m == null then null else elemAt m 0;
 
-    ret =
-      if channel == "stable" then
-        assertWith (date == null) "Stable version with specific date is not supported"
-          manifests.stable.latest
-      else if channel == "nightly" then
-        manifests.nightly.${if date != null then date else "latest"} or (throw "Nightly ${date} is not available")
-      else if channel == "beta" then
-        throw "Beta channel is not supported yet"
-      else if asVersion != null then
-        assertWith (date == null) "Stable version with specific date is not supported"
-          manifests.stable.${channel} or (throw "Stable ${channel} is not available")
-      else if asNightlyDate != null then
-        assertWith (date == null) "Cannot specify date in both `channel` and `date`"
-          manifests.nightly.${asNightlyDate} or (throw "Nightly ${asNightlyDate} is not available")
-      else throw "Unknown channel: ${channel}";
-
-  in fromManifestFile ret { inherit stdenv fetchurl patchelf; };
+  in
+    if channel == "stable" then
+      assertWith (date == null) "Stable version with specific date is not supported"
+        manifests.stable.latest
+    else if channel == "nightly" then
+      manifests.nightly.${if date != null then date else "latest"} or (throw "Nightly ${date} is not available")
+    else if channel == "beta" then
+      throw "Beta channel is not supported yet"
+    else if asVersion != null then
+      assertWith (date == null) "Stable version with specific date is not supported"
+        manifests.stable.${channel} or (throw "Stable ${channel} is not available")
+    else if asNightlyDate != null then
+      assertWith (date == null) "Cannot specify date in both `channel` and `date`"
+        manifests.nightly.${asNightlyDate} or (throw "Nightly ${asNightlyDate} is not available")
+    else throw "Unknown channel: ${channel}";
 
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
   # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
   fromRustupToolchain = { channel, components ? [], targets ? [] }:
-    (fromManifest { inherit channel; } { inherit (self) stdenv fetchurl patchelf; }
-    ).rust.override {
+    (toolchainFromManifest (selectManifest { inherit channel; })).rust.override {
       extensions = components;
       inherit targets;
     };
@@ -216,6 +213,8 @@ let
     in
       map (nameAndSrc: (installComponent nameAndSrc.name nameAndSrc.src)) namesAndSrcs;
 
+  # Genereate the toolchain set from a parsed manifest.
+  #
   # Manifest files are organized as follow:
   # { date = "2017-03-03";
   #   pkg.cargo.version= "0.18.0-nightly (5db6d64 2017-03-03)";
@@ -244,14 +243,14 @@ let
   #                       All extensions in this list will be installed for the target architectures.
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
-  fromManifestFile = pkgs: { stdenv, fetchurl, patchelf }:
+  toolchainFromManifest = pkgs:
     let
       inherit (builtins) elemAt;
       inherit (super) makeOverridable;
       inherit (super.lib) flip mapAttrs;
     in
     flip mapAttrs pkgs.pkg (name: pkg:
-      makeOverridable ({extensions, targets, targetExtensions}:
+      makeOverridable ({ extensions, targets, targetExtensions, stdenv, fetchurl, patchelf }:
         let
           version' = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
           version = if version' == null then pkg.version else "${elemAt version' 0}-${elemAt version' 2}-${elemAt version' 1}";
@@ -283,12 +282,21 @@ let
 
             meta.platforms = stdenv.lib.platforms.all;
           }
-      ) { extensions = []; targets = []; targetExtensions = []; }
+      ) {
+        extensions = [];
+        targets = [];
+        targetExtensions = [];
+        inherit (self) stdenv fetchurl patchelf;
+      }
     );
 
-in
+  # Same as `toolchainFromManifest` but read from a manifest file.
+  toolchainFromManifestFile = path: toolchainFromManifest (builtins.fromTOML (builtins.readFile path));
 
-rec {
+  # Override all pkgs of a toolchain set.
+  overrideToolchain = attrs: super.lib.mapAttrs (name: pkg: pkg.override attrs);
+
+in {
   # For each channel:
   #   rust-bin.stable.latest.cargo
   #   rust-bin.stable.latest.rust   # Aggregate all others. (recommended)
@@ -305,42 +313,47 @@ rec {
   #   rust-bin.nightly."2020-01-01".rust
   rust-bin = with builtins;
     (super.rust-bin or {}) //
-    mapAttrs (channel: manifests:
-      mapAttrs (version: manifest:
-        fromManifestFile manifest { inherit (self) stdenv fetchurl patchelf; }
-      ) manifests
-    ) super.rust-bin.manifests //
+    mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
       fromRustupToolchainFile = path: fromRustupToolchain (fromTOML (readFile path)).toolchain;
       inherit fromRustupToolchain;
     };
 
-  # Compat with mozilla overlay.
-  lib = super.lib // {
-    rustLib = super.lib.rustLib {
-      inherit fromManifest fromManifestFile;
+  # All attributes below are for compatiblity with mozilla overlay.
+
+  lib = (super.lib or {}) // {
+    rustLib = (super.lib.rustLib or {}) // {
+      manifest_v2_url = throw ''
+        `manifest_v2_url` is not supported.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '';
+      fromManifest = throw ''
+        `fromManifest` is not supported due to network access during evaluation.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '';
+      fromManifestFile = manifestFilePath: { stdenv, fetchurl, patchelf }@deps: builtins.trace ''
+        `fromManifestFile` is deprecated.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '' (overrideToolchain deps (toolchainFromManifestFile manifestFilePath));
     };
   };
 
-  # Compat with mozilla overlay.
-  rustChannelOf = manifest_args: fromManifest
-    manifest_args
-    { inherit (self) stdenv fetchurl patchelf; };
+  rustChannelOf = manifestArgs: toolchainFromManifest (selectManifest manifestArgs);
 
-  # Compat with mozilla overlay.
   latest = (super.latest or {}) // {
     rustChannels = {
-      nightly = rustChannelOf { channel = "nightly"; };
-      # beta    = rustChannelOf { channel = "beta"; };
-      stable  = rustChannelOf { channel = "stable"; };
+      stable = self.rust-bin.stable.latest;
+      beta = throw "Beta channel is not supported yet";
+      nightly = self.rust-bin.nightly.latest;
     };
   };
 
-  # Compat with mozilla overlay.
   rustChannelOfTargets = channel: date: targets:
-    (rustChannelOf { inherit channel date; })
+    (self.rustChannelOf { inherit channel date; })
       .rust.override { inherit targets; };
 
-  # Compat with mozilla overlay.
-  rustChannels = latest.rustChannels;
+  rustChannels = self.latest.rustChannels;
 }
