@@ -87,9 +87,9 @@ Here's an example of using it in nixos configuration.
     distRoot = "https://static.rust-lang.org/dist";
 
     # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
-    # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+    # See: https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file
     fromRustupToolchain = { channel, components ? [], targets ? [] }: «derivation»;
-    # Same as `fromRustupToolchain` but read from a `rust-toolchain` TOML file.
+    # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
     fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
 
     stable = {

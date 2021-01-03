@@ -96,12 +96,16 @@
             extensions = [ "rustfmt-preview" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
-        rustup-toolchain-customization-file = assertEq
-          (fromRustupToolchainFile ./tests/rust-toolchain)
+
+        rustup-toolchain-file-toml = assertEq
+          (fromRustupToolchainFile ./tests/rust-toolchain-toml)
           (nightly."2020-07-10".rust.override {
             extensions = [ "rustfmt-preview" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
+        rustup-toolchain-file-legacy = assertEq
+          (fromRustupToolchainFile ./tests/rust-toolchain-legacy)
+          nightly."2020-07-10".rust;
       };
 
       checkDrvs = {};

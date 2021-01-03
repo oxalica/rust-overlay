@@ -34,12 +34,21 @@ let
     else throw "Unknown channel: ${channel}";
 
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
-  # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+  # See: https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file
   fromRustupToolchain = { channel, components ? [], targets ? [] }:
     (toolchainFromManifest (selectManifest { inherit channel; })).rust.override {
       extensions = components;
       inherit targets;
     };
+
+  # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
+  fromRustupToolchainFile = path: let
+    inherit (builtins) readFile match fromTOML head;
+    content = readFile path;
+    legacy = match "([^\r\n]+)\r?\n?" content;
+  in if legacy != null
+    then fromRustupToolchain { channel = head legacy; }
+    else fromRustupToolchain (fromTOML content).toolchain;
 
   getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
     let
@@ -315,8 +324,7 @@ in {
     (super.rust-bin or {}) //
     mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
-      fromRustupToolchainFile = path: fromRustupToolchain (fromTOML (readFile path)).toolchain;
-      inherit fromRustupToolchain;
+      inherit fromRustupToolchain fromRustupToolchainFile;
     };
 
   # All attributes below are for compatiblity with mozilla overlay.
