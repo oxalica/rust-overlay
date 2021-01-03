@@ -106,7 +106,7 @@ def translate_dump_manifest(manifest: str, f, nightly=False):
     strip_tail = '-preview'
 
     f.write('{')
-    f.write(f'date={escape_nix_string(date)};')
+    f.write(f'd={escape_nix_string(date)};')
     f.write(f'r={renames_idx};')
     for pkg_name in sorted(manifest['pkg'].keys()):
         pkg = manifest['pkg'][pkg_name]

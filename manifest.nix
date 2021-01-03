@@ -42,8 +42,8 @@ let
 
   # Uncompress the compressed manifest to the original one
   # (not complete but has enough information to make up the toolchain).
-  uncompressManifest = nightly: version: { date /* date */, r /* rename index */, ... }@manifest: rec {
-    inherit date;
+  uncompressManifest = nightly: version: { d /* date */, r /* rename index */, ... }@manifest: rec {
+    date = d;
     renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
     pkg =
       mapAttrs (pkgName: { v /* pkg version */, k ? 0 /* url kind */, ... }@hashes: {
@@ -67,7 +67,7 @@ let
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
           }) (removeAttrs hashes ["v" "k"]);
-      }) (removeAttrs manifest ["date" "r"]);
+      }) (removeAttrs manifest ["d" "r"]);
   };
 
   uncompressManifestSet = nightly: set: let
