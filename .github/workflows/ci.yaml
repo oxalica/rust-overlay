@@ -23,12 +23,14 @@ jobs:
           experimental-features = nix-command flakes
         nix_path: nixpkgs=channel:nixos-unstable
     - name: Check flake
-      # Building checks is too slow.
-      run: nix flake check -v --show-trace --no-build --no-update-lock-file
+      run: nix flake check -v --show-trace --no-update-lock-file
 
-  check-build-stable:
-    name: Check build the latest stable Rust
-    runs-on: ubuntu-latest
+  check-build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    name: Check build latest Rust stable
+    runs-on: ${{ matrix.os }}
     steps:
     - name: Checkout
       uses: actions/checkout@v2
