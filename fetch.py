@@ -282,13 +282,12 @@ def sync_nightly_channel(*, stop_if_exists, max_fetch=None):
 
 def main():
     args = sys.argv[1:]
-    if len(args) == 0:
-        print('Synchronizing stable channels')
-        sync_stable_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
-        print('\nSynchronizing beta channels')
-        sync_beta_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
-        print('\nSynchronizing nightly channels')
-        sync_nightly_channel(stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
+    if len(args) == 1 and args[0] in ['stable', 'beta', 'nightly']:
+        {
+            'stable': sync_stable_channel,
+            'beta': sync_beta_channel,
+            'nightly': sync_nightly_channel,
+        }[args[0]](stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
     elif len(args) == 2 and args[0] == 'stable':
         if args[1] == 'all':
             sync_stable_channel(stop_if_exists=False)
@@ -316,8 +315,8 @@ def main():
     else:
         print('''
 Usage:
-    {0}
-        Auto-sync new versions from channels.
+    {0} <channel>
+        Auto-sync new versions from a channel.
     {0} <channel> <version>
         Force to fetch a specific version from a channel.
     {0} <channel> all

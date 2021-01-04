@@ -26,10 +26,16 @@ jobs:
       run: pip3 install toml requests
     - name: Install Nix
       uses: cachix/install-nix-action@v12
-    - name: Sync channels
+    - name: Sync stable channel
       timeout-minutes: 5
-      run: python3 ./fetch.py
-    - name: Commit changes
+      run: python3 ./fetch.py stable
+    - name: Sync beta channel
+      timeout-minutes: 5
+      run: python3 ./fetch.py beta
+    - name: Sync nightly channel
+      timeout-minutes: 5
+      run: python3 ./fetch.py nightly
+    - name: Check and commit changes
       id: commit
       continue-on-error: true
       run: |
