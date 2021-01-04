@@ -149,11 +149,19 @@ let
           # entire unpacked contents after just a little twiddling.
           preferLocalBuild = true;
 
+          nativeBuildInputs = [ self.python3 ];
+
+          # VERBOSE_INSTALL = 1; # No spam by default.
+
+          installPhase = ''
+            runHook preInstall
+            python3 ${./rust-installer.py}
+            runHook postInstall
+          '';
+
           # (@nbp) TODO: Check on Windows and Mac.
           # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
-          installPhase = ''
-            patchShebangs install.sh
-            CFG_DISABLE_LDCONFIG=1 ./install.sh --prefix=$out --verbose
+          preFixup = ''
             setInterpreter() {
               local dir="$1"
               [ -e "$dir" ] || return 0
