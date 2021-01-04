@@ -29,21 +29,25 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-    name: Check build latest Rust stable
+        channel: [stable, beta]
+    name: Check build Rust
     runs-on: ${{ matrix.os }}
+    env:
+      build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.rust
     steps:
     - name: Checkout
       uses: actions/checkout@v2
-      with:
-        fetch-depth: 0 # Nix Flakes doesn't work on shallow clones
     - name: Install Nix (flakes, nixos-unstable)
       uses: cachix/install-nix-action@v12
       with:
-        install_url: https://github.com/numtide/nix-flakes-installer/releases/download/nix-2.4pre20201221_9fab14a/install
-        extra_nix_config: |
-          experimental-features = nix-command flakes
         nix_path: nixpkgs=channel:nixos-unstable
-    - name: Build
+    - name: Build Rust
       run: |
-        nix build ".#rust" -L
+        nix-build -E "$build_expr"
         ./result/bin/rustc --version
+    - name: Check compile
+      run: |
+        echo 'fn main() { println!("hello, world"); }' >./test.rs
+        # Use nix-shell to bring propagatedBuildInputs into scope.
+        nix-shell -p "$build_expr" --pure --command "rustc test.rs -o test"
+        [[ "$(./test)" == "hello, world" ]]

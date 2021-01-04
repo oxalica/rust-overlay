@@ -16,21 +16,33 @@ let
     asVersion = match "[0-9]+\\.[0-9]+\\.[0-9]+" channel;
     asNightlyDate = let m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel; in
       if m == null then null else elemAt m 0;
+    asBetaDate = let m = match "beta-([0-9]+-[0-9]+-[0-9]+)" channel; in
+      if m == null then null else elemAt m 0;
 
   in
+    # "stable"
     if channel == "stable" then
       assertWith (date == null) "Stable version with specific date is not supported"
         manifests.stable.latest
+    # "nightly"
     else if channel == "nightly" then
       manifests.nightly.${if date != null then date else "latest"} or (throw "Nightly ${date} is not available")
+    # "beta"
     else if channel == "beta" then
-      throw "Beta channel is not supported yet"
+      manifests.beta.${if date != null then date else "latest"} or (throw "Beta ${date} is not available")
+    # "1.49.0"
     else if asVersion != null then
       assertWith (date == null) "Stable version with specific date is not supported"
         manifests.stable.${channel} or (throw "Stable ${channel} is not available")
+    # "beta-2021-01-01"
+    else if asBetaDate != null then
+      assertWith (date == null) "Cannot specify date in both `channel` and `date`"
+        manifests.beta.${asBetaDate} or (throw "Beta ${asBetaDate} is not available")
+    # "nightly-2021-01-01"
     else if asNightlyDate != null then
       assertWith (date == null) "Cannot specify date in both `channel` and `date`"
         manifests.nightly.${asNightlyDate} or (throw "Nightly ${asNightlyDate} is not available")
+    # Otherwise
     else throw "Unknown channel: ${channel}";
 
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
@@ -340,6 +352,9 @@ in {
   # For a specific version of stable:
   #   rust-bin.stable."1.47.0".rust
   #
+  # For a specific date of beta:
+  #   rust-bin.beta."2021-01-01".rust
+  #
   # For a specific date of nightly:
   #   rust-bin.nightly."2020-01-01".rust
   rust-bin = with builtins;
@@ -376,7 +391,7 @@ in {
   latest = (super.latest or {}) // {
     rustChannels = {
       stable = self.rust-bin.stable.latest;
-      beta = throw "Beta channel is not supported yet";
+      beta = self.rust-bin.beta.latest;
       nightly = self.rust-bin.nightly.latest;
     };
   };
