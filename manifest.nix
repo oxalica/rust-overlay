@@ -3,6 +3,7 @@ with (prev.lib);
 with builtins;
 let
   targets = import ./manifests/targets.nix // { _ = "*"; };
+  renamesList = import ./manifests/renames.nix;
 
   inherit (final.rust-bin) distRoot;
 
@@ -39,32 +40,38 @@ let
     extensions = singleTargetTups ++ multiTargetTups;
   };
 
-  # version -> { pkgName = { _1 = "..."; } } -> { pkgName = { x86_64-unknown-linux-gnu = fetchurl { .. }; } }
-  uncompressManifest = nightly: version: { date, ... }@manifest: rec {
-    inherit date;
+  # Uncompress the compressed manifest to the original one
+  # (not complete but has enough information to make up the toolchain).
+  uncompressManifest = nightly: version: {
+    v, # rustc version
+    d, # date
+    r, # rename index
+    ...
+  }@manifest: rec {
+    date = d;
+    renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
     pkg =
-      mapAttrs (pkgName: { v, k ? 0, ... }@hashes: {
-        version = v;
+      mapAttrs (pkgName: { u ? null /* url version */, ... }@hashes: {
+        # We use rustc version for all components to reduce manifest size.
+        # This version is just used for component derivation name.
+        version = "${v} (000000000 ${d})"; # "<version> (<commit-hash> yyyy-mm-dd)"
         target =
           mapAttrs' (targetIdx: hash: let
             target = targets.${targetIdx};
             pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
-            vHead = head (match "([^ ]*) .*" v);
             urlVersion =
-              if nightly then "nightly"     # 'nightly'
-              else if k == 0 then vHead     # '0.44.1 (aaaaaaaaa 2018-01-01)' -> '0.44.1' [package version]
-              else if k == 1 then v         # '0.44.1 (aaaaaaaaa 2018-01-01)' [package version]
-              else if k == 2 then version   # '1.49.0' [stable toolchain version]
-              else throw "Invalid k";
+              if u != null then u             # Use specified url version if exists.
+              else if nightly then "nightly"  # Otherwise, for nightly channel, default to be "nightly".
+              else v;                         # For stable channel, default to be rustc version.
           in {
             name = target;
             value = {
               xz_url = "${distRoot}/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
-          }) (removeAttrs hashes ["v" "k"]);
-      }) (removeAttrs manifest ["date"]);
+          }) (removeAttrs hashes ["u"]);
+      }) (removeAttrs manifest ["v" "d" "r"]);
   };
 
   uncompressManifestSet = nightly: set: let

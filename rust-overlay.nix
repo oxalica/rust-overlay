@@ -252,23 +252,32 @@ let
   #                       All extensions in this list will be installed for the target architectures.
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
-  toolchainFromManifest = pkgs:
-    let
-      inherit (builtins) elemAt;
-      inherit (super) makeOverridable;
-      inherit (super.lib) flip mapAttrs;
-    in
-    flip mapAttrs pkgs.pkg (name: pkg:
+  toolchainFromManifest = pkgs: let
+    inherit (builtins) elemAt;
+    inherit (super) makeOverridable;
+    inherit (super.lib) flip mapAttrs;
+
+    maybeRename = name: pkgs.renames.${name}.to or name;
+
+    mkPackage = name: pkg:
       makeOverridable ({ extensions, targets, targetExtensions, stdenv, fetchurl, patchelf }:
         let
-          version' = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
-          version = if version' == null then pkg.version else "${elemAt version' 0}-${elemAt version' 2}-${elemAt version' 1}";
-          namesAndSrcs = getComponents pkgs.pkg name targets extensions targetExtensions stdenv fetchurl;
+          m = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
+          version =
+            if m == null then pkg.version
+            else if builtins.match ".*nightly.*" pkg.version != null then "nightly-${elemAt m 2}"
+            else elemAt m 0;
+          extensions' = map maybeRename extensions;
+          targetExtensions' = map maybeRename targetExtensions;
+          namesAndSrcs = getComponents pkgs.pkg name targets extensions' targetExtensions' stdenv fetchurl;
           components = installComponents stdenv namesAndSrcs;
           componentsOuts = builtins.map (comp: (super.lib.strings.escapeNixString (super.lib.getOutput "out" comp))) components;
         in
           super.pkgs.symlinkJoin {
             name = name + "-" + version;
+            pname = name;
+            inherit version;
+
             paths = components;
             postBuild = ''
               # If rustc or rustdoc is in the derivation, we need to copy their
@@ -296,8 +305,13 @@ let
         targets = [];
         targetExtensions = [];
         inherit (self) stdenv fetchurl patchelf;
-      }
-    );
+      };
+
+    toolchain =
+      mapAttrs mkPackage pkgs.pkg //
+      mapAttrs (from: { to }: toolchain.${to}) pkgs.renames;
+
+  in toolchain;
 
   # Same as `toolchainFromManifest` but read from a manifest file.
   toolchainFromManifestFile = path: toolchainFromManifest (builtins.fromTOML (builtins.readFile path));

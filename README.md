@@ -147,8 +147,13 @@ Some examples (assume `nixpkgs` had the overlay applied):
     targets = [ "arm-unknown-linux-gnueabihf" ];
   }
   ```
+- If you already have a [`rust-toolchain` file for rustup](https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file),
+  you can simply use `fromRustupToolchainFile` to get the customized toolchain derivation.
 
-For detail about `override` , see the source code of `./rust-overlay.nix`,
-or README of [nixpkgs-mozilla][mozilla].
+  ```nix
+  nixpkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain
+  ```
+
+For more details, see also the source code of `./rust-overlay.nix`.
 
 [mozilla]: https://github.com/mozilla/nixpkgs-mozilla
