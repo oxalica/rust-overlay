@@ -41,13 +41,29 @@ jobs:
       uses: cachix/install-nix-action@v12
       with:
         nix_path: nixpkgs=channel:nixos-unstable
+    - name: Instantiate derivation
+      id: instantiate
+      run: |
+        drv_path=$(nix-instantiate -E "$build_expr")
+        echo "::set-output name=drv_path::$drv_path"
+    - name: Cache derivation status
+      id: cache-drv-status
+      uses: actions/cache@v2
+      with:
+        key: successful-drv-rust-${{ steps.instantiate.outputs.drv_path }}
+        path: successful
     - name: Build Rust
+      if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: |
         nix-build -E "$build_expr"
         ./result/bin/rustc --version
     - name: Check compile
+      if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: |
         echo 'fn main() { println!("hello, world"); }' >./test.rs
         # Use nix-shell to bring propagatedBuildInputs into scope.
         nix-shell -p "$build_expr" --pure --command "rustc test.rs -o test"
         [[ "$(./test)" == "hello, world" ]]
+    - name: Mark a successful build for cache
+      if: steps.cache-drv-status.outputs.cache-hit != 'true'
+      run: echo "1" >./successful
