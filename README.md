@@ -11,8 +11,8 @@ so the evaluation is *pure* and no need to have network (but [nixpkgs-mozilla][m
 It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
 
 - The toolchain hashes are auto-updated daily using GitHub Actions.
-- Current oldest supported version is stable 1.29.0 and nightly 2018-09-13
-  (which is randomly chosen).
+- Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
+  (which are randomly chosen).
 
 ## Use as a classic Nix overlay
 
@@ -108,6 +108,14 @@ Here's an example of using it in nixos configuration.
       # ... other versions.
     };
 
+    beta = {
+      # The latest beta toolchain.
+      latest = { /* toolchain */ };
+      "2021-01-01" = { /* toolchain */ };
+      "2020-12-30" = { /* toolchain */ };
+      # ... other versions.
+    };
+
     nightly = {
       # The latest nightly toolchain.
       latest = { /* toolchain */ };
@@ -130,10 +138,12 @@ Here's an example of using it in nixos configuration.
 
 Some examples (assume `nixpkgs` had the overlay applied):
 
-- Latest stable rust with all default components:
-  `nixpkgs.rust-bin.stable.latest.rust`
-- Latest nightly rust with all default components:
-  `nixpkgs.rust-bin.nightly.latest.rust`
+- Latest stable/beta/nightly rust with all default components:
+  `nixpkgs.rust-bin.{stable,beta,nightly}.latest.rust`
+- A specific version of stable rust:
+  `nixpkgs.rust-bin.stable."1.48.0".rust`
+- A specific date of beta rust:
+  `nixpkgs.rust-bin.nightly."2021-01-01".rust`
 - A specific version of stable rust:
   `nixpkgs.rust-bin.stable."1.48.0".rust`
 - A specific date of nightly rust:

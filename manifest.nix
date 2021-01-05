@@ -42,7 +42,7 @@ let
 
   # Uncompress the compressed manifest to the original one
   # (not complete but has enough information to make up the toolchain).
-  uncompressManifest = nightly: version: {
+  uncompressManifest = channel: version: {
     v, # rustc version
     d, # date
     r, # rename index
@@ -61,9 +61,9 @@ let
             pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
             urlVersion =
-              if u != null then u             # Use specified url version if exists.
-              else if nightly then "nightly"  # Otherwise, for nightly channel, default to be "nightly".
-              else v;                         # For stable channel, default to be rustc version.
+              if u != null then u                     # Use specified url version if exists.
+              else if channel == "stable" then v      # For stable channel, default to be rustc version.
+              else channel;                           # Otherwise, for beta/nightly channel, default to be "beta"/"nightly".
           in {
             name = target;
             value = {
@@ -74,8 +74,8 @@ let
       }) (removeAttrs manifest ["v" "d" "r"]);
   };
 
-  uncompressManifestSet = nightly: set: let
-    ret = mapAttrs (uncompressManifest nightly) (removeAttrs set ["latest"]);
+  uncompressManifestSet = channel: set: let
+    ret = mapAttrs (uncompressManifest channel) (removeAttrs set ["latest"]);
   in ret // { latest = ret.${set.latest}; };
 
 in {
@@ -86,8 +86,9 @@ in {
 
     # For internal usage.
     manifests = {
-      stable = uncompressManifestSet false (import ./manifests/stable);
-      nightly = uncompressManifestSet true (import ./manifests/nightly);
+      stable  = uncompressManifestSet "stable"  (import ./manifests/stable);
+      beta    = uncompressManifestSet "beta"    (import ./manifests/beta);
+      nightly = uncompressManifestSet "nightly" (import ./manifests/nightly);
     };
   };
 }
