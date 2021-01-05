@@ -110,6 +110,8 @@ def translate_dump_manifest(channel: str, manifest: str, f):
     renames_idx = compress_renames(manifest['renames'])
     strip_tail = '-preview'
 
+    default_url_version = rustc_version if channel == 'stable' else channel
+
     f.write('{')
     f.write(f'v={escape_nix_string(rustc_version)};')
     f.write(f'd={escape_nix_string(date)};')
@@ -135,7 +137,7 @@ def translate_dump_manifest(channel: str, manifest: str, f):
             url_version = url[len(start):-len(end)]
 
         f.write(f'{pkg_name}={{')
-        if not (url_version == rustc_version or (url_version == 'nightly' and nightly)):
+        if url_version != default_url_version:
             f.write(f'u={escape_nix_string(url_version)};')
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
