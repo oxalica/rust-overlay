@@ -22,19 +22,19 @@ jobs:
       uses: actions/setup-python@v2
       with:
         python-version: '3.8'
-    - name: Install python dependencies
-      run: pip3 install toml requests
+    - name: Install python packages
+      run: pip3 install -r ./scripts/requirements.txt
     - name: Install Nix
       uses: cachix/install-nix-action@v12
     - name: Sync stable channel
       timeout-minutes: 5
-      run: python3 ./fetch.py stable
+      run: python3 ./scripts/fetch.py stable
     - name: Sync beta channel
       timeout-minutes: 5
-      run: python3 ./fetch.py beta
+      run: python3 ./scripts/fetch.py beta
     - name: Sync nightly channel
       timeout-minutes: 5
-      run: python3 ./fetch.py nightly
+      run: python3 ./scripts/fetch.py nightly
     - name: Check and commit changes
       id: commit
       continue-on-error: true
