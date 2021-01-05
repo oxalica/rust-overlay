@@ -25,6 +25,40 @@ jobs:
     - name: Check flake
       run: nix flake check -v --show-trace --no-update-lock-file
 
+  check-sync-script:
+    name: Check sync script
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+    - name: Install python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.8'
+    - name: Install python packages
+      run: pip3 install -r ./scripts/requirements.txt
+    - name: Check re-fetch latest
+      run: |
+        for channel in stable beta nightly; do
+          version=$(sed -nE 's/.*latest = "(.*?)".*/\1/p' "./manifests/$channel/default.nix")
+          echo
+          echo "Remove current latest $channel $version and re-fetch"
+          rm "./manifests/$channel/default.nix"
+          if [[ "$channel" == "stable" ]]; then
+            rm "./manifests/$channel/$version.nix"
+          else
+            rm "./manifests/$channel/${version%%-*}/$version.nix"
+          fi
+
+          python3 ./scripts/fetch.py "$channel"
+          diff=$(git diff)
+          if [[ -n "$diff" ]]; then
+            echo "Unexpected difference:"
+            echo "$diff"
+            exit 1
+          fi
+        done
+
   check-build:
     strategy:
       matrix:
