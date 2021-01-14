@@ -92,6 +92,12 @@ Here's an example of using it in nixos configuration.
     # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
     fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
 
+    # [Experimental]
+    # Custom toolchain from a specific rustc git revision.
+    # This does almost the same thing as `rustup-toolchain-install-master`. (https://crates.io/crates/rustup-toolchain-install-master)
+    # Parameter `components` should be an attrset with component name as key and its SRI hash as value.
+    fromRustcRev = { pname ? .., rev, components, target ? .. }: «derivation»;
+
     stable = {
       # The latest stable toolchain.
       latest = {
@@ -162,6 +168,19 @@ Some examples (assume `nixpkgs` had the overlay applied):
 
   ```nix
   nixpkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain
+  ```
+- *\[Experimental\]*
+  Toolchain with specific rustc git revision.
+  This is useful for development of rust components like [MIRI](https://github.com/rust-lang/miri).
+  Note: the example below may not built since upstream CI periodly removes old artifacts.
+  ```nix
+  rust-bin.fromRustcRev {
+    rev = "a2cd91ceb0f156cb442d75e12dc77c3d064cdde4";
+    components = {
+      rustc = "sha256-x+OkPVStX00AiC3GupIdGzWluIK1BnI4ZCBbg72+ZuI=";
+      rust-src = "sha256-13PpzzYtd769Xkb0QzHpNfYCOnLMWFolc9QyYq98z2k=";
+    };
+  }
   ```
 
 For more details, see also the source code of `./rust-overlay.nix`.

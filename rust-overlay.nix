@@ -149,98 +149,122 @@ let
     in
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
-  installComponents = stdenv: namesAndSrcs:
-    let
-      inherit (builtins) map;
-      installComponent = name: src:
-        stdenv.mkDerivation {
-          inherit name;
-          inherit src;
+  installComponent = name: src:
+    self.stdenv.mkDerivation {
+      inherit name;
+      inherit src;
 
-          # No point copying src to a build server, then copying back the
-          # entire unpacked contents after just a little twiddling.
-          preferLocalBuild = true;
+      # No point copying src to a build server, then copying back the
+      # entire unpacked contents after just a little twiddling.
+      preferLocalBuild = true;
 
-          nativeBuildInputs = [ self.python3 ];
+      nativeBuildInputs = [ self.python3 ];
 
-          # VERBOSE_INSTALL = 1; # No spam by default.
+      # VERBOSE_INSTALL = 1; # No spam by default.
 
-          installPhase = ''
-            runHook preInstall
-            python3 ${./rust-installer.py}
-            runHook postInstall
-          '';
+      installPhase = ''
+        runHook preInstall
+        python3 ${./rust-installer.py}
+        runHook postInstall
+      '';
 
-          # (@nbp) TODO: Check on Windows and Mac.
-          # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
-          preFixup = ''
-            setInterpreter() {
-              local dir="$1"
-              [ -e "$dir" ] || return 0
-              header "Patching interpreter of ELF executables and libraries in $dir"
-              local i
-              while IFS= read -r -d ''$'\0' i; do
-                if [[ "$i" =~ .build-id ]]; then continue; fi
-                if ! isELF "$i"; then continue; fi
-                echo "setting interpreter of $i"
+      # (@nbp) TODO: Check on Windows and Mac.
+      # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
+      preFixup = ''
+        setInterpreter() {
+          local dir="$1"
+          [ -e "$dir" ] || return 0
+          header "Patching interpreter of ELF executables and libraries in $dir"
+          local i
+          while IFS= read -r -d ''$'\0' i; do
+            if [[ "$i" =~ .build-id ]]; then continue; fi
+            if ! isELF "$i"; then continue; fi
+            echo "setting interpreter of $i"
 
-                if [[ -x "$i" ]]; then
-                  # Handle executables
-                  patchelf \
-                    --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-                    --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-                    "$i" || true
-                else
-                  # Handle libraries
-                  patchelf \
-                    --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-                    "$i" || true
-                fi
-              done < <(find "$dir" -type f -print0)
-            }
-            setInterpreter $out
-          '';
-
-          postFixup = ''
-            # Function moves well-known files from etc/
-            handleEtc() {
-              local oldIFS="$IFS"
-              # Directories we are aware of, given as substitution lists
-              for paths in \
-                "etc/bash_completion.d","share/bash_completion/completions","etc/bash_completions.d","share/bash_completions/completions";
-                do
-                # Some directoties may be missing in some versions. If so we just skip them.
-                # See https://github.com/mozilla/nixpkgs-mozilla/issues/48 for more infomation.
-                if [ ! -e $paths ]; then continue; fi
-                IFS=","
-                set -- $paths
-                IFS="$oldIFS"
-                local orig_path="$1"
-                local wanted_path="$2"
-                # Rename the files
-                if [ -d ./"$orig_path" ]; then
-                  mkdir -p "$(dirname ./"$wanted_path")"
-                fi
-                mv -v ./"$orig_path" ./"$wanted_path"
-                # Fail explicitly if etc is not empty so we can add it to the list and/or report it upstream
-                rmdir ./etc || {
-                  echo Installer tries to install to /etc:
-                  find ./etc
-                  exit 1
-                }
-              done
-            }
-            if [ -d "$out"/etc ]; then
-              pushd "$out"
-              handleEtc
-              popd
+            if [[ -x "$i" ]]; then
+              # Handle executables
+              patchelf \
+                --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+                --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                "$i" || true
+            else
+              # Handle libraries
+              patchelf \
+                --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                "$i" || true
             fi
-          '';
+          done < <(find "$dir" -type f -print0)
+        }
+        setInterpreter $out
+      '';
 
-          dontStrip = true;
-        };
-    in
-      map (nameAndSrc: (installComponent nameAndSrc.name nameAndSrc.src)) namesAndSrcs;
+      postFixup = ''
+        # Function moves well-known files from etc/
+        handleEtc() {
+          local oldIFS="$IFS"
+          # Directories we are aware of, given as substitution lists
+          for paths in \
+            "etc/bash_completion.d","share/bash_completion/completions","etc/bash_completions.d","share/bash_completions/completions";
+            do
+            # Some directoties may be missing in some versions. If so we just skip them.
+            # See https://github.com/mozilla/nixpkgs-mozilla/issues/48 for more infomation.
+            if [ ! -e $paths ]; then continue; fi
+            IFS=","
+            set -- $paths
+            IFS="$oldIFS"
+            local orig_path="$1"
+            local wanted_path="$2"
+            # Rename the files
+            if [ -d ./"$orig_path" ]; then
+              mkdir -p "$(dirname ./"$wanted_path")"
+            fi
+            mv -v ./"$orig_path" ./"$wanted_path"
+            # Fail explicitly if etc is not empty so we can add it to the list and/or report it upstream
+            rmdir ./etc || {
+              echo Installer tries to install to /etc:
+              find ./etc
+              exit 1
+            }
+          done
+        }
+        if [ -d "$out"/etc ]; then
+          pushd "$out"
+          handleEtc
+          popd
+        fi
+      '';
+
+      dontStrip = true;
+    };
+
+  aggregateComponents = { pname, version, namesAndSrcs }:
+    self.pkgs.symlinkJoin {
+      name = pname + "-" + version;
+      inherit pname version;
+
+      paths = builtins.map ({ name, src }: (installComponent name src)) namesAndSrcs;
+
+      postBuild = ''
+        # If rustc or rustdoc is in the derivation, we need to copy their
+        # executable into the final derivation. This is required
+        # for making them find the correct SYSROOT.
+        for target in $out/bin/{rustc,rustdoc}; do
+          if [ -e $target ]; then
+            cp --remove-destination "$(realpath -e $target)" $target
+          fi
+        done
+      '';
+
+      # Add the compiler as part of the propagated build inputs in order
+      # to run:
+      #
+      #    $ nix-shell -p rustChannels.stable.rust
+      #
+      # And get a fully working Rust compiler, with the stdenv linker.
+      propagatedBuildInputs = [ self.stdenv.cc ];
+
+      meta.platforms = self.lib.platforms.all;
+    };
 
   # Genereate the toolchain set from a parsed manifest.
   #
@@ -290,35 +314,10 @@ let
           extensions' = map maybeRename extensions;
           targetExtensions' = map maybeRename targetExtensions;
           namesAndSrcs = getComponents pkgs.pkg name targets extensions' targetExtensions' stdenv fetchurl;
-          components = installComponents stdenv namesAndSrcs;
-          componentsOuts = builtins.map (comp: (super.lib.strings.escapeNixString (super.lib.getOutput "out" comp))) components;
         in
-          super.pkgs.symlinkJoin {
-            name = name + "-" + version;
+          aggregateComponents {
             pname = name;
-            inherit version;
-
-            paths = components;
-            postBuild = ''
-              # If rustc or rustdoc is in the derivation, we need to copy their
-              # executable into the final derivation. This is required
-              # for making them find the correct SYSROOT.
-              for target in $out/bin/{rustc,rustdoc}; do
-                if [ -e $target ]; then
-                  cp --remove-destination "$(realpath -e $target)" $target
-                fi
-              done
-            '';
-
-            # Add the compiler as part of the propagated build inputs in order
-            # to run:
-            #
-            #    $ nix-shell -p rustChannels.stable.rust
-            #
-            # And get a fully working Rust compiler, with the stdenv linker.
-            propagatedBuildInputs = [ stdenv.cc ];
-
-            meta.platforms = stdenv.lib.platforms.all;
+            inherit version namesAndSrcs;
           }
       ) {
         extensions = [];
@@ -338,6 +337,35 @@ let
 
   # Override all pkgs of a toolchain set.
   overrideToolchain = attrs: super.lib.mapAttrs (name: pkg: pkg.override attrs);
+
+  # From a git revision of rustc.
+  # This does the same thing as crate `rustup-toolchain-install-master`.
+  # But you need to manually provide component hashes.
+  fromRustcRev = {
+    # Package name of the derivation.
+    pname ? "rust-custom",
+    # Git revision of rustc.
+    rev,
+    # Attrset with component name as key and its SRI hash as value.
+    components,
+    # Rust target to download.
+    target ? super.rust.toRustTarget self.stdenv.targetPlatform
+  }: let
+    shortRev = builtins.substring 0 7 rev;
+    namesAndSrcs = super.lib.mapAttrsToList (component: hash: {
+      name = "${component}-${shortRev}";
+      src = self.fetchurl {
+        url = if component == "rust-src"
+          then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${component}-nightly.tar.xz"
+          else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${component}-nightly-${target}.tar.xz";
+        inherit hash;
+      };
+    }) components;
+  in
+    aggregateComponents {
+      version = shortRev;
+      inherit pname namesAndSrcs;
+    };
 
 in {
   # For each channel:
@@ -362,6 +390,8 @@ in {
     mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
       inherit fromRustupToolchain fromRustupToolchainFile;
+      # Experimental feature.
+      inherit fromRustcRev;
     };
 
   # All attributes below are for compatiblity with mozilla overlay.
