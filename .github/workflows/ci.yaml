@@ -37,27 +37,39 @@ jobs:
         python-version: '3.8'
     - name: Install python packages
       run: pip3 install -r ./scripts/requirements.txt
-    - name: Check re-fetch latest
+    - name: Clean the latest version of each channel
       run: |
         for channel in stable beta nightly; do
           version=$(sed -nE 's/.*latest = "(.*?)".*/\1/p' "./manifests/$channel/default.nix")
-          echo
-          echo "Remove current latest $channel $version and re-fetch"
+          echo "Remove $channel $version"
           rm "./manifests/$channel/default.nix"
           if [[ "$channel" == "stable" ]]; then
             rm "./manifests/$channel/$version.nix"
           else
             rm "./manifests/$channel/${version%%-*}/$version.nix"
           fi
-
-          python3 ./scripts/fetch.py "$channel"
-          diff=$(git diff)
-          if [[ -n "$diff" ]]; then
-            echo "Unexpected difference:"
-            echo "$diff"
-            exit 1
-          fi
         done
+    - name: Re-fetch latest stable
+      run: python3 ./scripts/fetch.py stable
+    - name: Re-fetch latest beta
+      run: python3 ./scripts/fetch.py beta
+    - name: Re-fetch latest nightly
+      run: python3 ./scripts/fetch.py nightly
+    - name: Check file changes
+      run: |
+        short_status=$(git status --short)
+        echo "$short_status"
+        shopt -s extglob
+        while read -r change; do
+          case "$change" in
+            "?? "manifests/@(stable|nightly|beta)/* ) ;;
+            "M "manifests/@(renames.nix|targets.nix) ) ;;
+            "M "manifests/@(stable|nightly|beta)/default.nix ) ;;
+            * )
+              echo "Unexpected change: $change"
+              exit 1
+          esac
+        done <<<"$short_status"
 
   check-build:
     strategy:

@@ -14,7 +14,7 @@ import requests
 
 MAX_TRIES = 3
 RETRY_DELAY = 3.0
-SYNC_MAX_FETCH = 5
+SYNC_MAX_UPDATE = 8
 
 MIN_STABLE_VERSION = '1.29.0'
 MIN_BETA_DATE = MIN_NIGHTLY_DATE = datetime.date.fromisoformat('2018-09-13')
@@ -155,7 +155,8 @@ def translate_dump_manifest(channel: str, manifest: str, f):
         f.write('};')
     f.write('}\n')
 
-def fetch_manifest(channel: str, version: str, out_path: Path):
+# Fetch and translate manifest file and return if it is successfully fetched.
+def fetch_manifest(channel: str, version: str, out_path: Path) -> bool:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix('.tmp')
     print(f'Fetching {channel} {version}')
@@ -166,12 +167,13 @@ def fetch_manifest(channel: str, version: str, out_path: Path):
     manifest = fetch_url(url, allow_not_found=channel != 'stable')
     if manifest is None:
         print('Not found, skipped')
-        return
+        return False
     manifest = manifest.text
     MANIFEST_TMP_PATH.write_text(manifest)
     with open(tmp_path, 'w') as fout:
         translate_dump_manifest(channel, manifest, fout)
     tmp_path.rename(out_path)
+    return True
 
 def update_stable_index(dir=Path('manifests/stable')):
     versions = sorted(
@@ -198,7 +200,7 @@ def update_nightly_index(dir=Path('manifests/nightly')):
         f.write(f'  latest = {escape_nix_string(dates[-1])};\n')
         f.write('}\n')
 
-def sync_stable_channel(*, stop_if_exists, max_fetch=None):
+def sync_stable_channel(*, stop_if_exists, max_update=None):
     GITHUB_RELEASES_URL = 'https://api.github.com/repos/rust-lang/rust/releases'
     PER_PAGE = 100
 
@@ -231,12 +233,12 @@ def sync_stable_channel(*, stop_if_exists, max_fetch=None):
                 continue
             print(f'{version} is already fetched. Stopped')
             break
-        fetch_manifest('stable', version, out_path)
+        assert fetch_manifest('stable', version, out_path), f'Stable version {version} not found'
         processed += 1
-        assert max_fetch is None or processed <= max_fetch, 'Too many versions'
+        assert max_update is None or processed <= max_update, 'Too many versions'
     update_stable_index()
 
-def sync_beta_channel(*, stop_if_exists, max_fetch=None):
+def sync_beta_channel(*, stop_if_exists, max_update=None):
     # Fetch the global nightly manifest to retrive the latest nightly version.
     print('Fetching latest beta version')
     manifest = fetch_url(f'{DIST_ROOT}/channel-rust-beta.toml').text
@@ -254,12 +256,12 @@ def sync_beta_channel(*, stop_if_exists, max_fetch=None):
                 continue
             print(f'{date_str} is already fetched. Stopped')
             break
-        fetch_manifest('beta', date_str, out_path)
-        processed += 1
-        assert max_fetch is None or processed <= max_fetch, 'Too many versions'
+        if fetch_manifest('beta', date_str, out_path):
+            processed += 1
+        assert max_update is None or processed <= max_update, 'Too many versions'
     update_beta_index()
 
-def sync_nightly_channel(*, stop_if_exists, max_fetch=None):
+def sync_nightly_channel(*, stop_if_exists, max_update=None):
     # Fetch the global nightly manifest to retrive the latest nightly version.
     print('Fetching latest nightly version')
     manifest = fetch_url(f'{DIST_ROOT}/channel-rust-nightly.toml').text
@@ -277,9 +279,9 @@ def sync_nightly_channel(*, stop_if_exists, max_fetch=None):
                 continue
             print(f'{date_str} is already fetched. Stopped')
             break
-        fetch_manifest('nightly', date_str, out_path)
-        processed += 1
-        assert max_fetch is None or processed <= max_fetch, 'Too many versions'
+        if fetch_manifest('nightly', date_str, out_path):
+            processed += 1
+        assert max_update is None or processed <= max_update, 'Too many versions'
     update_nightly_index()
 
 def main():
@@ -289,7 +291,7 @@ def main():
             'stable': sync_stable_channel,
             'beta': sync_beta_channel,
             'nightly': sync_nightly_channel,
-        }[args[0]](stop_if_exists=True, max_fetch=SYNC_MAX_FETCH)
+        }[args[0]](stop_if_exists=True, max_update=SYNC_MAX_UPDATE)
     elif len(args) == 2 and args[0] == 'stable':
         if args[1] == 'all':
             sync_stable_channel(stop_if_exists=False)
