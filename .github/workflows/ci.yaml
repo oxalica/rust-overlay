@@ -62,6 +62,8 @@ jobs:
         shopt -s extglob
         while read -r change; do
           case "$change" in
+            # Okay if there is no change.
+            "" ) ;;
             "?? "manifests/@(stable|nightly|beta)/* ) ;;
             "M "manifests/@(renames.nix|targets.nix) ) ;;
             "M "manifests/@(stable|nightly|beta)/default.nix ) ;;
