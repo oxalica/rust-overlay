@@ -253,6 +253,16 @@ let
             cp --remove-destination "$(realpath -e $target)" $target
           fi
         done
+
+        if [ -e $out/bin/cargo-miri ]; then
+          cargo_miri=$(readlink $out/bin/cargo-miri)
+          cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri
+          chmod +w $out/bin/cargo-miri
+          substituteInPlace $out/bin/cargo-miri \
+            --replace "@bash@" "${self.pkgs.bash}/bin/bash" \
+            --replace "@miri@" "$cargo_miri" \
+            --replace "@out@" "$out"
+        fi
       '';
 
       # Add the compiler as part of the propagated build inputs in order
