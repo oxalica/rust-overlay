@@ -248,7 +248,7 @@ let
         # If rustc or rustdoc is in the derivation, we need to copy their
         # executable into the final derivation. This is required
         # for making them find the correct SYSROOT.
-        for target in $out/bin/{rustc,rustdoc}; do
+        for target in $out/bin/{rustc,rustdoc,miri}; do
           if [ -e $target ]; then
             cp --remove-destination "$(realpath -e $target)" $target
           fi
