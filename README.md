@@ -182,6 +182,7 @@ Some examples (assume `nixpkgs` had the overlay applied):
     };
   }
   ```
+- See more examples in directory `examples`.
 
 For more details, see also the source code of `./rust-overlay.nix`.
 
