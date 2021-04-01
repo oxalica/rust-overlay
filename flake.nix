@@ -5,10 +5,11 @@
   '';
 
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs";
     flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils, ... }@inputs: let
+  outputs = { self, nixpkgs, flake-utils }: let
     inherit (nixpkgs) lib;
 
     overlay = import ./.;
@@ -47,8 +48,19 @@
       lib.mapAttrs' (version: comps: {
         name = "rust-${lib.replaceStrings ["."] ["-"] version}";
         value = comps.rust;
-      }) pkgs.rust-bin.stable // {
+      }) pkgs.rust-bin.stable //
+      lib.mapAttrs' (version: comps: {
+        name = "rust-nightly-${version}";
+        value = comps.rust;
+      }) (removeAttrs pkgs.rust-bin.nightly [ "2018-11-01" "2020-09-12" ]) // # FIXME: `rust` is not available.
+      lib.mapAttrs' (version: comps: {
+        name = "rust-beta-${version}";
+        value = comps.rust;
+      }) (removeAttrs pkgs.rust-bin.beta [ "2018-11-09" ]) // # FIXME: `rust` is not available.
+      {
         rust = packages.rust-latest;
+        rust-nightly = packages.rust-nightly-latest;
+        rust-beta = packages.rust-beta-latest;
       };
 
     checks = let
