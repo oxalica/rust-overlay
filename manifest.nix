@@ -4,6 +4,7 @@ with builtins;
 let
   targets = import ./manifests/targets.nix // { _ = "*"; };
   renamesList = import ./manifests/renames.nix;
+  profilesList = import ./manifests/profiles.nix;
 
   inherit (final.rust-bin) distRoot;
 
@@ -43,15 +44,23 @@ let
   # Uncompress the compressed manifest to the original one
   # (not complete but has enough information to make up the toolchain).
   uncompressManifest = channel: version: {
-    v, # rustc version
-    d, # date
-    r, # rename index
+    v,        # Rustc version
+    d,        # Date
+    r,        # Renames index
+    p ? null, # Profiles index
     ...
   }@manifest: rec {
+
+    # Version used for derivation.
+    version = if builtins.match ".*(nightly|beta).*" v != null
+      then "${v}-${d}"  # 1.51.0-nightly-2021-01-01, 1.52.0-beta.2-2021-03-27
+      else v;           # 1.51.0
+
     date = d;
     renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
+
     pkg =
-      mapAttrs (pkgName: { u ? null /* url version */, ... }@hashes: {
+      mapAttrs (pkgName: { u ? null /* Version appears in URL */, ... }@hashes: {
         # We use rustc version for all components to reduce manifest size.
         # This version is just used for component derivation name.
         version = "${v} (000000000 ${d})"; # "<version> (<commit-hash> yyyy-mm-dd)"
@@ -61,7 +70,7 @@ let
             pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
             urlVersion =
-              if u != null then u                     # Use specified url version if exists.
+              if u != null then u                     # Use specified version for URL if exists.
               else if channel == "stable" then v      # For stable channel, default to be rustc version.
               else channel;                           # Otherwise, for beta/nightly channel, default to be "beta"/"nightly".
           in {
@@ -71,7 +80,18 @@ let
               xz_hash = hash;
             } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
           }) (removeAttrs hashes ["u"]);
-      }) (removeAttrs manifest ["v" "d" "r"]);
+      }) (removeAttrs manifest ["v" "d" "r" "p"]);
+
+    profiles = if p == null
+      then {}
+      # `rust-mingw` is in each profile but doesn't support platforms other than Windows.
+      else mapAttrs (name: remove "rust-mingw") (elemAt profilesList p);
+
+    targetComponentsList = [
+      "rust-std"
+      "rustc-dev"
+      "rustc-docs"
+    ];
   };
 
   uncompressManifestSet = channel: set: let
