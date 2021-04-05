@@ -74,7 +74,7 @@
         message = "`${lhs}` != `${rhs}`";
       };
       assertUrl = drv: url: let
-        srcUrl = lib.head (lib.head drv.paths).src.urls;
+        srcUrl = lib.head drv.src.urls;
       in assertEq srcUrl url;
 
       assertions = {
@@ -86,15 +86,24 @@
         url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustTarget}.tar.xz";
         url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustTarget}.tar.xz";
 
+      # Check only tier 1 targets.
+      } // lib.optionalAttrs (lib.elem system [ "aarch64-linux" "x86_64-linux" ]) {
+
+        name-stable = assertEq stable."1.48.0".rustc.name "rustc-1.48.0";
+        name-beta = assertEq beta."2021-01-01".rustc.name "rustc-1.50.0-beta.2-2021-01-01";
+        name-nightly = assertEq nightly."2021-01-01".rustc.name "rustc-1.51.0-nightly-2021-01-01";
+        name-stable-profile-default = assertEq stable."1.51.0".default.name "rust-default-1.51.0";
+        name-stable-profile-minimal = assertEq stable."1.51.0".minimal.name "rust-minimal-1.51.0";
+
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
         rename-unavailable = {
           assertion = !(stable."1.30.0" ? rustfmt);
           message = "1.30.0 has rustfmt still in preview state";
         };
 
-        latest-stable = assertEq pkgs.latest.rustChannels.stable.rust stable.latest.rust;
-        latest-beta = assertEq pkgs.latest.rustChannels.beta.rust beta.latest.rust;
-        latest-nightly = assertEq pkgs.latest.rustChannels.nightly.rust nightly.latest.rust;
+        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rust stable.latest.rust;
+        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rust beta.latest.rust;
+        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rust nightly.latest.rust;
 
         rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rust stable.latest.rust;
         rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rust beta.latest.rust;
@@ -103,32 +112,38 @@
         rust-channel-of-nightly-date = assertEq (rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rust nightly."2021-01-01".rust;
         rust-channel-of-beta-date = assertEq (rustChannelOf { channel = "beta"; date = "2021-01-01"; }).rust beta."2021-01-01".rust;
 
-        rustup-toolchain-stable = assertEq (fromRustupToolchain { channel = "stable"; }) stable.latest.rust;
-        rustup-toolchain-beta = assertEq (fromRustupToolchain { channel = "beta"; }) beta.latest.rust;
-        rustup-toolchain-nightly = assertEq (fromRustupToolchain { channel = "nightly"; }) nightly.latest.rust;
-        rustup-toolchain-version = assertEq (fromRustupToolchain { channel = "1.48.0"; }) stable."1.48.0".rust;
-        rustup-toolchain-nightly-date = assertEq (fromRustupToolchain { channel = "nightly-2021-01-01"; }) nightly."2021-01-01".rust;
-        rustup-toolchain-beta-date = assertEq (fromRustupToolchain { channel = "beta-2021-01-01"; }) beta."2021-01-01".rust;
+        rustup-toolchain-stable = assertEq (fromRustupToolchain { channel = "stable"; }) stable.latest.default;
+        rustup-toolchain-beta = assertEq (fromRustupToolchain { channel = "beta"; }) beta.latest.default;
+        # rustup-toolchain-nightly = assertEq (fromRustupToolchain { channel = "nightly"; }) nightly.latest.default; # Not always available
+        rustup-toolchain-version = assertEq (fromRustupToolchain { channel = "1.51.0"; }) stable."1.51.0".default;
+        rustup-toolchain-nightly-date = assertEq (fromRustupToolchain { channel = "nightly-2021-01-01"; }) nightly."2021-01-01".default;
+        rustup-toolchain-beta-date = assertEq (fromRustupToolchain { channel = "beta-2021-01-01"; }) beta."2021-01-01".default;
         rustup-toolchain-customization = assertEq
           (fromRustupToolchain {
-            channel = "1.48.0";
+            channel = "1.51.0";
             components = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           })
-          (stable."1.48.0".rust.override {
+          (stable."1.51.0".default.override {
             extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
 
         rustup-toolchain-file-toml = assertEq
           (fromRustupToolchainFile ./tests/rust-toolchain-toml)
-          (nightly."2020-07-10".rust.override {
+          (nightly."2021-03-25".default.override {
             extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
         rustup-toolchain-file-legacy = assertEq
           (fromRustupToolchainFile ./tests/rust-toolchain-legacy)
-          nightly."2020-07-10".rust;
+          nightly."2021-03-25".default;
+        rustup-toolchain-file-minimal = assertEq
+          (fromRustupToolchainFile ./tests/rust-toolchain-minimal)
+          (nightly."2021-03-25".minimal.override {
+            extensions = [ "rustfmt" "rustc-dev" ];
+            targets = [ "aarch64-unknown-linux-gnu" ];
+          });
       };
 
       checkDrvs = {};

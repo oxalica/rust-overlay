@@ -46,12 +46,16 @@ let
     else throw "Unknown channel: ${channel}";
 
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
-  # See: https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file
-  fromRustupToolchain = { channel, components ? [], targets ? [] }:
-    (toolchainFromManifest (selectManifest { inherit channel; })).rust.override {
-      extensions = components;
-      inherit targets;
-    };
+  # See: https://rust-lang.github.io/rustup/concepts/profiles.html
+  # Or see source: https://github.com/rust-lang/rustup/blob/84974df1387812269c7b29fa5f3bb1c6480a6500/doc/src/overrides.md#the-toolchain-file
+  fromRustupToolchain = { path ? null, channel ? null, components ? [], targets ? [], profile ? "default" }:
+    if path != null then throw "`path` is not supported, please directly add it to your PATH instead"
+    else if channel == null then throw "`channel` is required"
+    else
+      (toolchainFromManifest (selectManifest { inherit channel; }))._profiles.${profile}.override {
+        extensions = components;
+        inherit targets;
+      };
 
   # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
   fromRustupToolchainFile = path: let
@@ -107,15 +111,23 @@ let
 
   getFetchUrl = pkgs: pkgname: target: stdenv: fetchurl:
     let
+      srcInfo = pkgs.${pkgname}.target.${target};
+    in
+      mkComponentSrc {
+        url = srcInfo.xz_url;
+        sha256 = srcInfo.xz_hash;
+        inherit fetchurl;
+      };
+
+  mkComponentSrc = { url, sha256, fetchurl }:
+    let
       inherit (builtins) match elemAt;
-      pkg = pkgs.${pkgname};
-      srcInfo = pkg.target.${target};
-      url = builtins.replaceStrings [" "] ["%20"] srcInfo.xz_url; # This is required or download will fail.
+      url' = builtins.replaceStrings [" "] ["%20"] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
-      matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" srcInfo.xz_url;
+      matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-      (super.fetchurl { inherit name url; sha256 = srcInfo.xz_hash; });
+      fetchurl { inherit name sha256; url = url'; };
 
   checkMissingExtensions = pkgs: pkgname: stdenv: extensions:
     let
@@ -149,10 +161,9 @@ let
     in
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
-  installComponent = name: src:
+  mkComponent = { pname, version, src }:
     self.stdenv.mkDerivation {
-      inherit name;
-      inherit src;
+      inherit pname version src;
 
       # No point copying src to a build server, then copying back the
       # entire unpacked contents after just a little twiddling.
@@ -237,12 +248,12 @@ let
       dontStrip = true;
     };
 
-  aggregateComponents = { pname, version, namesAndSrcs }:
+  aggregateComponents = { pname, version, components }:
     self.pkgs.symlinkJoin {
       name = pname + "-" + version;
       inherit pname version;
 
-      paths = builtins.map ({ name, src }: (installComponent name src)) namesAndSrcs;
+      paths = components;
 
       postBuild = ''
         # If rustc or rustdoc is in the derivation, we need to copy their
@@ -283,6 +294,58 @@ let
       meta.platforms = self.lib.platforms.all;
     };
 
+  # Resolve final components to install from mozilla-overlay style `extensions`, `targets` and `targetExtensions`.
+  #
+  # `componentSet` has a layout of `componentSet.<name>.<rust-target> : Derivation`.
+  # `targetComponentsList` is a list of all component names for target platforms.
+  # `name` is only used for error message.
+  #
+  # Returns a list of component derivations, or throw if failed.
+  resolveComponents = { name, componentSet, targetComponentsList, extensions, targets, targetExtensions }:
+    let
+      inherit (self.lib) flatten elem isString filter any remove concatStringsSep concatMapStrings attrNames;
+      rustHostPlatform = self.rust.toRustTarget self.stdenv.hostPlatform;
+
+      collectComponentTargets = compName: comp:
+        # Platform irrelevent components like `rust-src`.
+        if comp ? "*" then
+          comp."*"
+        # Components for target platform like `rust-std`.
+        else if elem compName targetComponentsList then
+          collectTargetComponentTargets compName comp
+        # Components for host platform like `rustc`.
+        else
+          comp.${rustHostPlatform} or "Host component `${compName}` doesn't support target `${rustHostPlatform}`";
+
+      collectTargetComponentTargets = compName: comp:
+        let selected = remove null (map (tgt: comp.${tgt} or null) targets); in
+        if selected == []
+          then throw "Extension `${compName}` doesn't support any of targets: ${concatStringsSep ", " targets}"
+          else selected;
+
+      collectComponents = name: collectComponentTargets name (componentSet.${name} or "Missing extension `${name}`");
+      collectTargetComponents = name: collectTargetComponentTargets name (componentSet.${name} or "Missing target extension `${name}`");
+
+      result =
+        flatten (map collectComponents extensions) ++
+        flatten (map collectTargetComponents targetExtensions);
+
+      isTargetUnused = target:
+        !any (name: componentSet ? ${name}.${target})
+          (filter (name: elem name targetComponentsList) extensions ++ targetExtensions);
+
+      errors = filter isString result ++
+        map (tgt: "Target `${tgt}` is not supported by any components or extensions")
+          (filter isTargetUnused targets);
+
+    in
+      if errors == [] then result
+      else throw ''
+        Component resolution failed for ${name}
+        - note: available extensions are ${concatStringsSep ", " (attrNames componentSet)}
+        ${concatMapStrings (msg: "- ${msg}\n") errors}
+      '';
+
   # Genereate the toolchain set from a parsed manifest.
   #
   # Manifest files are organized as follow:
@@ -313,28 +376,30 @@ let
   #                       All extensions in this list will be installed for the target architectures.
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
-  toolchainFromManifest = pkgs: let
+  toolchainFromManifest = manifest: let
     inherit (builtins) elemAt;
     inherit (super) makeOverridable;
     inherit (super.lib) flip mapAttrs;
+    inherit (super.rust) toRustTarget;
 
-    maybeRename = name: pkgs.renames.${name}.to or name;
+    maybeRename = name: manifest.renames.${name}.to or name;
 
+    # For legacy pre-aggregated package `rust`.
     mkPackage = name: pkg:
       makeOverridable ({ extensions, targets, targetExtensions, stdenv, fetchurl, patchelf }:
         let
-          m = builtins.match "([^ ]*) [(]([^ ]*) ([^ ]*)[)]" pkg.version;
-          version =
-            if m == null then pkg.version
-            else if builtins.match ".*nightly.*" pkg.version != null then "nightly-${elemAt m 2}"
-            else elemAt m 0;
           extensions' = map maybeRename extensions;
           targetExtensions' = map maybeRename targetExtensions;
-          namesAndSrcs = getComponents pkgs.pkg name targets extensions' targetExtensions' stdenv fetchurl;
+          namesAndSrcs = getComponents manifest.pkg name targets extensions' targetExtensions' stdenv fetchurl;
         in
           aggregateComponents {
             pname = name;
-            inherit version namesAndSrcs;
+            version = manifest.version;
+            components = map ({ name, src }: (mkComponent {
+              pname = name;
+              inherit (manifest) version;
+              inherit src;
+            })) namesAndSrcs;
           }
       ) {
         extensions = [];
@@ -343,11 +408,60 @@ let
         inherit (self) stdenv fetchurl patchelf;
       };
 
-    toolchain =
-      mapAttrs mkPackage pkgs.pkg //
-      mapAttrs (from: { to }: toolchain.${to}) pkgs.renames;
+    # componentSet.cargo.x86_64-unknown-linux-gnu = <derivation>;
+    componentSet = mapAttrs (name: pkg:
+      mapAttrs (target: { xz_hash, xz_url }:
+        mkComponent {
+          pname = name;
+          inherit (manifest) version;
+          src = mkComponentSrc {
+            url = xz_url;
+            sha256 = xz_hash;
+            fetchurl = self.fetchurl;
+          };
+        }
+      ) pkg.target
+    ) (removeAttrs manifest.pkg ["rust"]) //
+    mapAttrs (name: { to }: componentSet.${to}) manifest.renames;
 
-  in toolchain;
+    mkProfile = name: componentNames:
+      makeOverridable ({ extensions, targets, targetExtensions }:
+        aggregateComponents {
+          pname = "rust-${name}";
+          version = manifest.version;
+          components = resolveComponents {
+            name = "rust-${name}-${manifest.version}";
+            inherit componentSet;
+            inherit (manifest) targetComponentsList;
+            extensions = componentNames ++ extensions;
+            targets = [ (toRustTarget self.stdenv.targetPlatform) ] ++ targets;
+            inherit targetExtensions;
+          };
+        }
+      ) {
+        extensions = [];
+        targets = [];
+        targetExtensions = [];
+      };
+
+    profiles = mapAttrs mkProfile manifest.profiles;
+
+  in
+    # Components.
+    mapAttrs (name: targets: targets."*" or targets.${toRustTarget self.stdenv.hostPlatform} or null) componentSet //
+    # Profiles.
+    profiles //
+    {
+      # Legacy support for special pre-aggregated package.
+      # It has more components than `default` profile but less than `complete` profile.
+      rust = mkPackage "rust" manifest.pkg.rust;
+
+      # Internal use.
+      _components = componentSet;
+      _profiles = if profiles == {}
+        then throw "Rust ${manifest.version} doesn't support profiles"
+        else profiles;
+    };
 
   # Same as `toolchainFromManifest` but read from a manifest file.
   toolchainFromManifestFile = path: toolchainFromManifest (builtins.fromTOML (builtins.readFile path));
