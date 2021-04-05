@@ -105,6 +105,9 @@ jobs:
       run: |
         nix-build -E "$build_expr"
         ./result/bin/rustc --version
+    - name: Prepare nix-shell
+      if: steps.cache-drv-status.outputs.cache-hit != 'true'
+      run: nix-shell -p "$build_expr" --pure --command "exit"
     - name: Check compile
       if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: |
