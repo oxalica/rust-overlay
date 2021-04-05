@@ -263,6 +263,11 @@ let
             --replace "@miri@" "$cargo_miri" \
             --replace "@out@" "$out"
         fi
+
+        # `symlinkJoin` (`runCommand`) doesn't handle propagatedBuildInputs.
+        # Need to do it manually.
+        mkdir -p "$out/nix-support"
+        echo "$propagatedBuildInputs" > "$out/nix-support/propagated-build-inputs"
       '';
 
       # Add the compiler as part of the propagated build inputs in order
@@ -271,7 +276,9 @@ let
       #    $ nix-shell -p rustChannels.stable.rust
       #
       # And get a fully working Rust compiler, with the stdenv linker.
-      propagatedBuildInputs = [ self.stdenv.cc ];
+      propagatedBuildInputs =
+        [ self.stdenv.cc ] ++
+        self.lib.optional (self.stdenv.hostPlatform.isDarwin) self.libiconv;
 
       meta.platforms = self.lib.platforms.all;
     };
