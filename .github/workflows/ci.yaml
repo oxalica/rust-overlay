@@ -88,7 +88,6 @@ jobs:
     - name: Get locked nixpkgs revision
       id: nixpkgs_rev
       run: |
-        sudo apt-get install -y jq
         rev=$(jq '.nodes.nixpkgs.locked.rev' --raw-output flake.lock)
         echo "Revision: $rev"
         echo "::set-output name=rev::$rev"
