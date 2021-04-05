@@ -454,7 +454,16 @@ let
     {
       # Legacy support for special pre-aggregated package.
       # It has more components than `default` profile but less than `complete` profile.
-      rust = mkPackage "rust" manifest.pkg.rust;
+      rust =
+        let pkg = mkPackage "rust" manifest.pkg.rust; in
+        if builtins.match ".*[.].*[.].*" != null
+          then builtins.trace ''
+            Rust ${manifest.version}:
+            Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
+            Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
+            See README for more information.
+          '' pkg
+          else pkg;
 
       # Internal use.
       _components = componentSet;

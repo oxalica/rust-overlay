@@ -22,7 +22,7 @@ You can put the code below into your `~/.config/nixpkgs/overlays.nix`.
 ```
 Then the provided attribute paths are available in nix command.
 ```bash
-$ nix-env -iA rust-bin.stable.latest.rust # Do anything you like.
+$ nix-env -iA rust-bin.stable.latest.default # Do anything you like.
 ```
 
 Alternatively, you can install it into nix channels.
@@ -68,7 +68,7 @@ Here's an example of using it in nixos configuration.
           ./configuration.nix # Your system configuration.
           ({ pkgs, ... }: {
             nixpkgs.overlays = [ rust-overlay.overlay ];
-            environment.systemPackages = [ pkgs.rust-bin.stable.latest.rust ];
+            environment.systemPackages = [ pkgs.rust-bin.stable.latest.default ];
           })
         ];
       };
@@ -164,18 +164,16 @@ Some examples (assume `nixpkgs` had the overlay applied):
   You can check availability on [Rustup packages availibility](https://rust-lang.github.io/rustup-components-history/).
 
 - A specific version of stable rust:
-  `nixpkgs.rust-bin.stable."1.48.0".rust`
+  `nixpkgs.rust-bin.stable."1.48.0".default`
 - A specific date of beta rust:
-  `nixpkgs.rust-bin.nightly."2021-01-01".rust`
-- A specific version of stable rust:
-  `nixpkgs.rust-bin.stable."1.48.0".rust`
+  `nixpkgs.rust-bin.beta."2021-01-01".default`
 - A specific date of nightly rust:
-  `nixpkgs.rust-bin.nightly."2020-12-31".rust`
+  `nixpkgs.rust-bin.nightly."2020-12-31".default`
 - Latest stable rust with additional component `rust-src` and extra target
   `arm-unknown-linux-gnueabihf`:
 
   ```nix
-  nixpkgs.rust-bin.stable.latest.rust.override {
+  nixpkgs.rust-bin.stable.latest.default.override {
     extensions = [ "rust-src" ];
     targets = [ "arm-unknown-linux-gnueabihf" ];
   }
