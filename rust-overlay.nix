@@ -162,7 +162,7 @@ let
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
   mkComponent = { pname, version, src }:
-    self.stdenv.mkDerivation {
+    self.stdenv.mkDerivation ({
       inherit pname version src;
 
       # No point copying src to a build server, then copying back the
@@ -246,7 +246,7 @@ let
       '';
 
       dontStrip = true;
-    };
+    });
 
   aggregateComponents = { pname, version, components }:
     self.pkgs.symlinkJoin {
@@ -275,21 +275,19 @@ let
             --replace "@out@" "$out"
         fi
 
-        # `symlinkJoin` (`runCommand`) doesn't handle propagatedBuildInputs.
+        # `symlinkJoin` (`runCommand`) doesn't handle propagated dependencies.
         # Need to do it manually.
         mkdir -p "$out/nix-support"
         echo "$propagatedBuildInputs" > "$out/nix-support/propagated-build-inputs"
+        if [[ -n "$depsTargetTargetPropagated" ]]; then
+          echo "$depsTargetTargetPropagated" > "$out/nix-support/propagated-target-target-deps"
+        fi
       '';
 
-      # Add the compiler as part of the propagated build inputs in order
-      # to run:
-      #
-      #    $ nix-shell -p rustChannels.stable.rust
-      #
-      # And get a fully working Rust compiler, with the stdenv linker.
-      propagatedBuildInputs =
-        [ self.stdenv.cc ] ++
-        self.lib.optional (self.stdenv.hostPlatform.isDarwin) self.libiconv;
+      # FIXME: If these propagated dependencies go components, darwin build will fail with "`-liconv` not found".
+      propagatedBuildInputs = [ self.stdenv.cc ];
+      depsTargetTargetPropagated =
+        self.lib.optional (self.stdenv.targetPlatform.isDarwin) self.targetPackages.libiconv;
 
       meta.platforms = self.lib.platforms.all;
     };
@@ -434,7 +432,10 @@ let
             inherit componentSet;
             inherit (manifest) targetComponentsList;
             extensions = componentNames ++ extensions;
-            targets = [ (toRustTarget self.stdenv.targetPlatform) ] ++ targets;
+            targets = [
+              (toRustTarget self.stdenv.hostPlatform) # Build script requires host std.
+              (toRustTarget self.stdenv.targetPlatform)
+            ] ++ targets;
             inherit targetExtensions;
           };
         }
