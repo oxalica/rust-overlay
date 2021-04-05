@@ -483,19 +483,21 @@ let
     target ? super.rust.toRustTarget self.stdenv.targetPlatform
   }: let
     shortRev = builtins.substring 0 7 rev;
-    namesAndSrcs = super.lib.mapAttrsToList (component: hash: {
-      name = "${component}-${shortRev}";
+    components' = super.lib.mapAttrsToList (compName: hash: mkComponent {
+      pname = compName;
+      version = shortRev;
       src = self.fetchurl {
-        url = if component == "rust-src"
-          then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${component}-nightly.tar.xz"
-          else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${component}-nightly-${target}.tar.xz";
+        url = if compName == "rust-src"
+          then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly.tar.xz"
+          else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
         inherit hash;
       };
     }) components;
   in
     aggregateComponents {
+      inherit pname;
       version = shortRev;
-      inherit pname namesAndSrcs;
+      components = components';
     };
 
 in {
