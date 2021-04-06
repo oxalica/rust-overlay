@@ -143,6 +143,10 @@
             targets = [ "wasm32-unknown-unknown" "aarch64-unknown-linux-gnu" ];
           });
 
+        rustup-toolchain-profile-missing = assertEq (builtins.tryEval (fromRustupToolchain { channel = "1.51.0"; profile = "non_existent"; })).success false;
+        rustup-toolchain-profile-too-early = assertEq (builtins.tryEval (fromRustupToolchain { channel = "1.29.0"; profile = "minimal"; })).success false;
+        rustup-toolchain-profile-fallback = assertEq (fromRustupToolchain { channel = "1.29.0"; }) stable."1.29.0".rust;
+
         rustup-toolchain-file-toml = assertEq
           (fromRustupToolchainFile ./tests/rust-toolchain-toml)
           (nightly."2021-03-25".default.override {

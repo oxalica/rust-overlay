@@ -48,11 +48,25 @@ let
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
   # See: https://rust-lang.github.io/rustup/concepts/profiles.html
   # Or see source: https://github.com/rust-lang/rustup/blob/84974df1387812269c7b29fa5f3bb1c6480a6500/doc/src/overrides.md#the-toolchain-file
-  fromRustupToolchain = { path ? null, channel ? null, components ? [], targets ? [], profile ? "default" }:
+  fromRustupToolchain = { path ? null, channel ? null, profile ? null, components ? [], targets ? [] }:
     if path != null then throw "`path` is not supported, please directly add it to your PATH instead"
     else if channel == null then throw "`channel` is required"
     else
-      (toolchainFromManifest (selectManifest { inherit channel; }))._profiles.${profile}.override {
+      let
+        toolchain = toolchainFromManifest (selectManifest { inherit channel; });
+        profile' = if profile == null then "default" else profile;
+        pkg =
+          if toolchain._profiles != {} then
+            toolchain._profiles.${profile'} or (throw ''
+              Rust ${toolchain._version} doesn't have profile `${profile'}`.
+              Available profiles are: ${self.lib.concatStringsSep ", " (builtins.attrNames toolchain._profiles)}
+            '')
+          # Fallback to package `rust` when profiles are not supported and not specified.
+          else if profile == null then
+            toolchain.rust
+          else
+            throw "Cannot select profile `${profile'}` since rust ${toolchain._version} is too early to support profiles";
+      in pkg.override {
         extensions = components;
         inherit targets;
       };
@@ -468,9 +482,8 @@ let
 
       # Internal use.
       _components = componentSet;
-      _profiles = if profiles == {}
-        then throw "Rust ${manifest.version} doesn't support profiles"
-        else profiles;
+      _profiles = profiles;
+      _version = manifest.version;
     };
 
   # Same as `toolchainFromManifest` but read from a manifest file.
