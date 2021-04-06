@@ -22,7 +22,7 @@ You can put the code below into your `~/.config/nixpkgs/overlays.nix`.
 ```
 Then the provided attribute paths are available in nix command.
 ```bash
-$ nix-env -iA rust-bin.stable.latest.rust # Do anything you like.
+$ nix-env -iA rust-bin.stable.latest.default # Do anything you like.
 ```
 
 Alternatively, you can install it into nix channels.
@@ -68,7 +68,7 @@ Here's an example of using it in nixos configuration.
           ./configuration.nix # Your system configuration.
           ({ pkgs, ... }: {
             nixpkgs.overlays = [ rust-overlay.overlay ];
-            environment.systemPackages = [ pkgs.rust-bin.stable.latest.rust ];
+            environment.systemPackages = [ pkgs.rust-bin.stable.latest.default ];
           })
         ];
       };
@@ -87,7 +87,7 @@ Here's an example of using it in nixos configuration.
     distRoot = "https://static.rust-lang.org/dist";
 
     # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
-    # See: https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file
+    # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
     fromRustupToolchain = { channel, components ? [], targets ? [] }: «derivation»;
     # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
     fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
@@ -101,8 +101,18 @@ Here's an example of using it in nixos configuration.
     stable = {
       # The latest stable toolchain.
       latest = {
-        # Aggregate all default components. (recommended)
+        # [Experimental]
+        # Profiles, predefined component sets.
+        # See: https://rust-lang.github.io/rustup/concepts/profiles.html
+        minimal = «derivation»;  # Only `cargo`, `rustc` and `rust-std`.
+        default = «derivation»;  # The default profile of `rustup`. Good for general use.
+        complete = «derivation»; # Do not use it. It almost always fails.
+
+        # Pre-aggregated package provided by upstream, the most commonly used package in `mozilla-overlay`.
+        # It consists of an uncertain number of components, usually more than the `default` profile of `rustup`
+        # but less than `complete` profile.
         rust = «derivation»;
+
         # Individial components.
         rustc = «derivation»;
         cargo = «derivation»;
@@ -144,31 +154,38 @@ Here's an example of using it in nixos configuration.
 
 Some examples (assume `nixpkgs` had the overlay applied):
 
-- Latest stable/beta/nightly rust with all default components:
+- Latest stable/beta/nightly rust with almost all components (provided the same as `mozilla-overlay`):
   `nixpkgs.rust-bin.{stable,beta,nightly}.latest.rust`
+- *\[Experimental\]*
+  Latest stable/beta/nightly rust with `default` or `minimal` profile (provided the same as default behavior of `rustup install`).
+  `nixpkgs.rust-bin.{stable,beta,nightly}.latest.{default,minimal}`
+
+  Note: `default` profile on `nightly` may not always be available due to absense of required components.
+  You can check availability on [Rustup packages availibility](https://rust-lang.github.io/rustup-components-history/).
+
 - A specific version of stable rust:
-  `nixpkgs.rust-bin.stable."1.48.0".rust`
+  `nixpkgs.rust-bin.stable."1.48.0".default`
 - A specific date of beta rust:
-  `nixpkgs.rust-bin.nightly."2021-01-01".rust`
-- A specific version of stable rust:
-  `nixpkgs.rust-bin.stable."1.48.0".rust`
+  `nixpkgs.rust-bin.beta."2021-01-01".default`
 - A specific date of nightly rust:
-  `nixpkgs.rust-bin.nightly."2020-12-31".rust`
+  `nixpkgs.rust-bin.nightly."2020-12-31".default`
 - Latest stable rust with additional component `rust-src` and extra target
   `arm-unknown-linux-gnueabihf`:
 
   ```nix
-  nixpkgs.rust-bin.stable.latest.rust.override {
+  nixpkgs.rust-bin.stable.latest.default.override {
     extensions = [ "rust-src" ];
     targets = [ "arm-unknown-linux-gnueabihf" ];
   }
   ```
-- If you already have a [`rust-toolchain` file for rustup](https://github.com/ebroto/rustup/blob/c2db7dac6b38c99538eec472db9d23d18f918409/README.md#the-toolchain-file),
+
+- If you already have a [`rust-toolchain` file for rustup][rust-toolchain],
   you can simply use `fromRustupToolchainFile` to get the customized toolchain derivation.
 
   ```nix
   nixpkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain
   ```
+
 - *\[Experimental\]*
   Toolchain with specific rustc git revision.
   This is useful for development of rust components like [MIRI](https://github.com/rust-lang/miri).
@@ -182,8 +199,10 @@ Some examples (assume `nixpkgs` had the overlay applied):
     };
   }
   ```
+
 - See more examples in directory `examples`.
 
 For more details, see also the source code of `./rust-overlay.nix`.
 
 [mozilla]: https://github.com/mozilla/nixpkgs-mozilla
+[rust-toolchain]: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file

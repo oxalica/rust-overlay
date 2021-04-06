@@ -24,6 +24,7 @@ NIX_KEYWORDS = {'', 'if', 'then', 'else', 'assert', 'with', 'let', 'in', 'rec', 
 MANIFEST_TMP_PATH = Path('manifest.tmp')
 TARGETS_PATH = Path('manifests/targets.nix')
 RENAMES_PATH = Path('manifests/renames.nix')
+PROFILES_PATH = Path('manifests/profiles.nix')
 
 RE_STABLE_VERSION = re.compile(r'^\d+\.\d+\.\d+$')
 
@@ -86,6 +87,25 @@ def compress_renames(renames: dict) -> int:
         f.write(']\n')
     return idx
 
+profiles_map = dict((line.strip(), i) for i, line in enumerate(PROFILES_PATH.read_text().strip().split('\n')[1:-1]))
+def compress_profiles(profiles: dict) -> int:
+    serialized = '{ ' + ''.join(
+        escape_nix_key(k) + ' = [ ' + ''.join(escape_nix_string(comp) + ' ' for comp in v) + ']; '
+        for k, v in sorted(profiles.items())
+    ) + '}'
+
+    if serialized in profiles_map:
+        return profiles_map[serialized]
+    idx = len(profiles_map)
+    profiles_map[serialized] = idx
+
+    with open(str(PROFILES_PATH), 'w') as f:
+        f.write('[\n')
+        for _, ser in sorted((idx, ser) for ser, idx in profiles_map.items()):
+            f.write('  ' + ser + '\n')
+        f.write(']\n')
+    return idx
+
 def fetch_url(url: str, params=None, allow_not_found=False):
     i = 0
     while True:
@@ -116,6 +136,9 @@ def translate_dump_manifest(channel: str, manifest: str, f):
     f.write(f'v={escape_nix_string(rustc_version)};')
     f.write(f'd={escape_nix_string(date)};')
     f.write(f'r={renames_idx};')
+    if 'profiles' in manifest:
+        f.write(f'p={compress_profiles(manifest["profiles"])};')
+
     for pkg_name in sorted(manifest['pkg'].keys()):
         pkg = manifest['pkg'][pkg_name]
         pkg_name_stripped = pkg_name[:-len(strip_tail)] if pkg_name.endswith(strip_tail) else pkg_name
