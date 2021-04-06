@@ -457,7 +457,7 @@ let
       # It has more components than `default` profile but less than `complete` profile.
       rust =
         let pkg = mkPackage "rust" manifest.pkg.rust; in
-        if builtins.match ".*[.].*[.].*" != null
+        if builtins.match ".*[.].*[.].*" != null && profiles != {}
           then builtins.trace ''
             Rust ${manifest.version}:
             Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.

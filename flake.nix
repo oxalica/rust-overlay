@@ -41,27 +41,41 @@
     };
     defaultPackage = packages.rust;
 
-    # FIXME: We can only directly provide derivations here without nested set.
-    # Currently we only provide stable releases. Some nightly versions have components missing
-    # on some platforms, which makes `nix flake check` to be failed.
-    packages =
-      lib.mapAttrs' (version: comps: {
-        name = "rust-${lib.replaceStrings ["."] ["-"] version}";
-        value = comps.rust;
-      }) pkgs.rust-bin.stable //
-      lib.mapAttrs' (version: comps: {
-        name = "rust-nightly-${version}";
-        value = comps.rust;
-      }) (removeAttrs pkgs.rust-bin.nightly [ "2018-11-01" "2020-09-12" ]) // # FIXME: `rust` is not available.
-      lib.mapAttrs' (version: comps: {
-        name = "rust-beta-${version}";
-        value = comps.rust;
-      }) (removeAttrs pkgs.rust-bin.beta [ "2018-11-09" ]) // # FIXME: `rust` is not available.
-      {
-        rust = packages.rust-latest;
-        rust-nightly = packages.rust-nightly-latest;
-        rust-beta = packages.rust-beta-latest;
-      };
+    packages = let
+      inherit (builtins) tryEval;
+
+      defaultPkg = comps:
+        if comps ? default then
+          if (tryEval comps.default.drvPath).success then
+            comps.default
+          else if (tryEval comps.minimal.drvPath).success then
+            comps.minimal
+          else
+            null
+        else if (tryEval comps.rust.drvPath).success then
+          comps.rust
+        else
+          null;
+
+      result =
+        lib.mapAttrs' (version: comps: {
+          name = "rust-${lib.replaceStrings ["."] ["-"] version}";
+          value = defaultPkg comps;
+        }) pkgs.rust-bin.stable //
+        lib.mapAttrs' (version: comps: {
+          name = "rust-nightly-${version}";
+          value = defaultPkg comps;
+        }) pkgs.rust-bin.nightly //
+        lib.mapAttrs' (version: comps: {
+          name = "rust-beta-${version}";
+          value = defaultPkg comps;
+        }) pkgs.rust-bin.beta //
+        {
+          rust = result.rust-latest;
+          rust-nightly = result.rust-nightly-latest;
+          rust-beta = result.rust-beta-latest;
+        };
+    in lib.filterAttrs (name: drv: drv != null) result;
 
     checks = let
       inherit (pkgs) rust-bin rustChannelOf;
@@ -101,16 +115,16 @@
           message = "1.30.0 has rustfmt still in preview state";
         };
 
-        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rust stable.latest.rust;
-        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rust beta.latest.rust;
-        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rust nightly.latest.rust;
+        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rustc stable.latest.rustc;
+        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rustc beta.latest.rustc;
+        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rustc nightly.latest.rustc;
 
-        rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rust stable.latest.rust;
-        rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rust beta.latest.rust;
-        rust-channel-of-nightly = assertEq (rustChannelOf { channel = "nightly"; }).rust nightly.latest.rust;
-        rust-channel-of-version = assertEq (rustChannelOf { channel = "1.48.0"; }).rust stable."1.48.0".rust;
-        rust-channel-of-nightly-date = assertEq (rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rust nightly."2021-01-01".rust;
-        rust-channel-of-beta-date = assertEq (rustChannelOf { channel = "beta"; date = "2021-01-01"; }).rust beta."2021-01-01".rust;
+        rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rustc stable.latest.rustc;
+        rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rustc beta.latest.rustc;
+        rust-channel-of-nightly = assertEq (rustChannelOf { channel = "nightly"; }).rustc nightly.latest.rustc;
+        rust-channel-of-version = assertEq (rustChannelOf { channel = "1.48.0"; }).rustc stable."1.48.0".rustc;
+        rust-channel-of-nightly-date = assertEq (rustChannelOf { channel = "nightly"; date = "2021-01-01"; }).rustc nightly."2021-01-01".rustc;
+        rust-channel-of-beta-date = assertEq (rustChannelOf { channel = "beta"; date = "2021-01-01"; }).rustc beta."2021-01-01".rustc;
 
         rustup-toolchain-stable = assertEq (fromRustupToolchain { channel = "stable"; }) stable.latest.default;
         rustup-toolchain-beta = assertEq (fromRustupToolchain { channel = "beta"; }) beta.latest.default;
