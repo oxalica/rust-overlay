@@ -183,13 +183,19 @@ let
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ self.python3 ];
-
-      # VERBOSE_INSTALL = 1; # No spam by default.
+      nativeBuildInputs = [ self.cpio ];
 
       installPhase = ''
         runHook preInstall
-        python3 ${./rust-installer.py}
+        installerVersion=$(< ./rust-installer-version)
+        if [[ "$installerVersion" != 3 ]]; then
+          echo "Unknown installer version: $installerVersion"
+        fi
+        while read -r comp; do
+          echo "Installing component $comp"
+          # Use cpio with file list instead of forking tons of cp.
+          cut -d: -f2 <"$comp/manifest.in" | cpio --quiet -pdD "$comp" "$out"
+        done <./components
         runHook postInstall
       '';
 
