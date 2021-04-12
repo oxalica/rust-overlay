@@ -176,20 +176,26 @@ let
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
   mkComponent = { pname, version, src }:
-    self.stdenv.mkDerivation ({
+    self.stdenv.mkDerivation {
       inherit pname version src;
 
       # No point copying src to a build server, then copying back the
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ self.python3 ];
-
-      # VERBOSE_INSTALL = 1; # No spam by default.
+      nativeBuildInputs = [ self.cpio ];
 
       installPhase = ''
         runHook preInstall
-        python3 ${./rust-installer.py}
+        installerVersion=$(< ./rust-installer-version)
+        if [[ "$installerVersion" != 3 ]]; then
+          echo "Unknown installer version: $installerVersion"
+        fi
+        while read -r comp; do
+          echo "Installing component $comp"
+          # Use cpio with file list instead of forking tons of cp.
+          cut -d: -f2 <"$comp/manifest.in" | cpio --quiet -pdD "$comp" "$out"
+        done <./components
         runHook postInstall
       '';
 
@@ -226,41 +232,19 @@ let
       postFixup = ''
         # Function moves well-known files from etc/
         handleEtc() {
-          local oldIFS="$IFS"
-          # Directories we are aware of, given as substitution lists
-          for paths in \
-            "etc/bash_completion.d","share/bash_completion/completions","etc/bash_completions.d","share/bash_completions/completions";
-            do
-            # Some directoties may be missing in some versions. If so we just skip them.
-            # See https://github.com/mozilla/nixpkgs-mozilla/issues/48 for more infomation.
-            if [ ! -e $paths ]; then continue; fi
-            IFS=","
-            set -- $paths
-            IFS="$oldIFS"
-            local orig_path="$1"
-            local wanted_path="$2"
-            # Rename the files
-            if [ -d ./"$orig_path" ]; then
-              mkdir -p "$(dirname ./"$wanted_path")"
-            fi
-            mv -v ./"$orig_path" ./"$wanted_path"
-            # Fail explicitly if etc is not empty so we can add it to the list and/or report it upstream
-            rmdir ./etc || {
-              echo Installer tries to install to /etc:
-              find ./etc
-              exit 1
-            }
-          done
+          if [[ -d "$1" ]]; then
+            mkdir -p "$(dirname "$2")"
+            mv -T "$1" "$2"
+          fi
         }
-        if [ -d "$out"/etc ]; then
-          pushd "$out"
-          handleEtc
-          popd
+        if [[ -e "$out/etc" ]]; then
+          handleEtc "$out/etc/bash_completion.d" "$out/share/bash-completion/completions"
+          rmdir $out/etc || { echo "Installer tries to install to /etc: $(ls $out/etc)"; exit 1; }
         fi
       '';
 
       dontStrip = true;
-    });
+    };
 
   aggregateComponents = { pname, version, components }:
     self.pkgs.symlinkJoin {
