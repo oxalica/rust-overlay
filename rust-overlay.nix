@@ -175,7 +175,7 @@ let
     in
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
-  mkComponent = { pname, version, src }:
+  mkComponent = { pname, version, src, rustc /* clippy depends on rustc */ }:
     self.stdenv.mkDerivation {
       inherit pname version src;
 
@@ -227,6 +227,12 @@ let
           done < <(find "$dir" -type f -print0)
         }
         setInterpreter $out
+      '' + super.lib.optionalString (pname == "clippy-preview") ''
+        if [[ -e "$out/bin/clippy-driver" ]]; then
+          patchelf \
+            --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+            "$out/bin/clippy-driver" || true
+        fi
       '';
 
       postFixup = ''
@@ -395,6 +401,9 @@ let
               pname = name;
               inherit (manifest) version;
               inherit src;
+              # The component name is `rust`.
+              # clippy-driver will be patched to $out/lib without touching this.
+              rustc = null;
             })) namesAndSrcs;
           }
       ) {
@@ -415,6 +424,8 @@ let
             sha256 = xz_hash;
             fetchurl = self.fetchurl;
           };
+          rustc = componentSet.rustc.${target} or
+            (throw "clippy depends on rustc, which is not available");
         }
       ) pkg.target
     ) (removeAttrs manifest.pkg ["rust"]) //
@@ -490,7 +501,7 @@ let
     target ? super.rust.toRustTarget self.stdenv.targetPlatform
   }: let
     shortRev = builtins.substring 0 7 rev;
-    components' = super.lib.mapAttrsToList (compName: hash: mkComponent {
+    components' = super.lib.mapAttrs (compName: hash: mkComponent {
       pname = compName;
       version = shortRev;
       src = self.fetchurl {
@@ -499,12 +510,13 @@ let
           else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
         inherit hash;
       };
+      rustc = components'.rustc or (throw "rustc is required for clippy");
     }) components;
   in
     aggregateComponents {
       inherit pname;
       version = shortRev;
-      components = components';
+      components = builtins.attrValues components';
     };
 
 in {
