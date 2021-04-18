@@ -199,41 +199,52 @@ let
         runHook postInstall
       '';
 
-      # (@nbp) TODO: Check on Windows and Mac.
       # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
-      preFixup = ''
-        setInterpreter() {
-          local dir="$1"
-          [ -e "$dir" ] || return 0
-          header "Patching interpreter of ELF executables and libraries in $dir"
-          local i
-          while IFS= read -r -d ''$'\0' i; do
-            if [[ "$i" =~ .build-id ]]; then continue; fi
-            if ! isELF "$i"; then continue; fi
-            echo "setting interpreter of $i"
+      preFixup =
+        let
+          inherit (super.lib) optionalString;
+          inherit (self.stdenv) hostPlatform;
+        in
+        optionalString hostPlatform.isLinux ''
+          setInterpreter() {
+            local dir="$1"
+            [ -e "$dir" ] || return 0
+            header "Patching interpreter of ELF executables and libraries in $dir"
+            local i
+            while IFS= read -r -d ''$'\0' i; do
+              if [[ "$i" =~ .build-id ]]; then continue; fi
+              if ! isELF "$i"; then continue; fi
+              echo "setting interpreter of $i"
 
-            if [[ -x "$i" ]]; then
-              # Handle executables
+              if [[ -x "$i" ]]; then
+                # Handle executables
+                patchelf \
+                  --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
+                  --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                  "$i" || true
+              else
+                # Handle libraries
+                patchelf \
+                  --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                  "$i" || true
+              fi
+            done < <(find "$dir" -type f -print0)
+          }
+          setInterpreter $out
+        '' + optionalString (pname == "clippy-preview") ''
+          if [[ -e "$out/bin/clippy-driver" ]]; then
+            ${optionalString hostPlatform.isLinux ''
               patchelf \
-                --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-                --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-                "$i" || true
-            else
-              # Handle libraries
-              patchelf \
-                --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-                "$i" || true
-            fi
-          done < <(find "$dir" -type f -print0)
-        }
-        setInterpreter $out
-      '' + super.lib.optionalString (pname == "clippy-preview") ''
-        if [[ -e "$out/bin/clippy-driver" ]]; then
-          patchelf \
-            --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-            "$out/bin/clippy-driver" || true
-        fi
-      '';
+                --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                "$out/bin/clippy-driver" || true
+            ''}
+            ${optionalString hostPlatform.isDarwin ''
+              install_name_tool \
+                -add_rpath "${rustc}/lib" \
+                "$out/bin/clippy-driver" || true
+            ''}
+          fi
+        '';
 
       postFixup = ''
         # Function moves well-known files from etc/

@@ -78,10 +78,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         channel: [stable, beta]
+        build_pkg: [rust, default]
     name: Check build Rust
     runs-on: ${{ matrix.os }}
     env:
-      build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.rust
+      build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.${{ matrix.build_pkg }}
     steps:
     - name: Checkout
       uses: actions/checkout@v2
@@ -104,7 +105,7 @@ jobs:
       id: cache-drv-status
       uses: actions/cache@v2
       with:
-        key: successful-drv-rust-${{ steps.instantiate.outputs.drv_path }}
+        key: drv-check-build-0-${{ steps.instantiate.outputs.drv_path }}
         path: successful
     - name: Build Rust
       if: steps.cache-drv-status.outputs.cache-hit != 'true'
@@ -114,13 +115,19 @@ jobs:
     - name: Prepare nix-shell
       if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: nix-shell -p "$build_expr" --pure --command "exit"
-    - name: Check compile
+    - name: Check `rustc` works
       if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: |
         echo 'fn main() { println!("hello, world"); }' >./test.rs
         # Use nix-shell to bring propagatedBuildInputs into scope.
         nix-shell -p "$build_expr" --pure --command "rustc test.rs -o test"
         [[ "$(./test)" == "hello, world" ]]
+    - name: Check `clippy` works
+      if: steps.cache-drv-status.outputs.cache-hit != 'true'
+      run: |
+        echo 'fn main() { loop { break; } }' >./test.rs
+        nix-shell -p "$build_expr" --pure --command 'clippy-driver test.rs -W clippy::never-loop' 2>&1 | tee msg
+        [[ ${PIPESTATUS[0]} -eq 0 && "$(cat msg)" == *"warning: this loop never actually loops"* ]]
     - name: Mark a successful build for cache
       if: steps.cache-drv-status.outputs.cache-hit != 'true'
       run: echo "1" >./successful
