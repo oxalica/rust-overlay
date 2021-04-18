@@ -78,10 +78,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         channel: [stable, beta]
+        build_pkg: [rust, default]
     name: Check build Rust
     runs-on: ${{ matrix.os }}
     env:
-      build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.rust
+      build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.${{ matrix.build_pkg }}
     steps:
     - name: Checkout
       uses: actions/checkout@v2
