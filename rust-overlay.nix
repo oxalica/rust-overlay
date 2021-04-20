@@ -244,6 +244,11 @@ let
                 "$out/bin/clippy-driver" || true
             ''}
           fi
+        '' + optionalString (pname == "llvm-tools-preview" && hostPlatform.isLinux) ''
+          dir="$out/lib/rustlib/${super.rust.toRustTarget hostPlatform}"
+          for f in "$dir"/bin/*; do
+            patchelf --set-rpath "$dir/lib" "$f" || true
+          done
         '';
 
       postFixup = ''
