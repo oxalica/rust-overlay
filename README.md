@@ -81,7 +81,7 @@ Here's an example of using it in nixos configuration.
 
 ### Example: A `devShell` Flake
 
-Assuming you have a valid `shell.nix`, running `nix develop` will create a shell with the default nightly Rust toolchain installed:
+Running `nix develop` will create a shell with the default nightly Rust toolchain installed:
 
 ```nix
 {
@@ -102,7 +102,37 @@ Assuming you have a valid `shell.nix`, running `nix develop` will create a shell
           };
         in
         {
-          devShell = import ./shell.nix { inherit pkgs; };
+          devShell = pkgs.mkShell {
+             buildInputs = [
+              pkgs.openssl
+              pkgs.binutils
+              pkgs.pkgconfig
+              pkgs.openssl
+              pkgs.openssl.dev
+              pkgs.gcc
+              pkgs.glibc
+              pkgs.gmp.dev
+              pkgs.nixpkgs-fmt
+              pkgs.exa
+              pkgs.ripgrep
+              pkgs.watchexec
+              pkgs.tokei
+              pkgs.bat
+              pkgs.fd
+              pkgs.terraform
+              pkgs.gperftools
+              pkgs.wrk
+              pkgs.valgrind
+              pkgs.rust-bin.nightly.latest.default
+            ];
+
+            shellHook = ''
+              alias ls=exa
+              alias find=fd
+              cargo update 
+              cargo install cargo-watch
+            '';
+          };
         }
       );
 }
