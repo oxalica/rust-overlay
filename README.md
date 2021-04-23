@@ -85,7 +85,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
 ```nix
 {
-  description = "Blah";
+  description = "A devShell example";
 
   inputs = {
     nixpkgs.url      = "github:nixos/nixpkgs/nixos-unstable";
