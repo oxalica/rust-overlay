@@ -79,7 +79,7 @@ Here's an example of using it in nixos configuration.
 }
 ```
 
-### Example: A `devShell` Flake
+### Example: Using `devShell` and `nix develop`
 
 Running `nix develop` will create a shell with the default nightly Rust toolchain installed:
 
