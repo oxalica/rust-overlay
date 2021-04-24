@@ -103,8 +103,8 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
       in
       {
         devShell = pkgs.mkShell {
-        	buildInputs = [
-          	pkgs.openssl
+          buildInputs = [
+            pkgs.openssl
             pkgs.pkgconfig
             pkgs.exa
             pkgs.fd
@@ -119,6 +119,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
       }
     );
 }
+
 ```
 
 ## Attributes provided by the overlay
