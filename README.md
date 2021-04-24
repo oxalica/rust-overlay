@@ -95,29 +95,29 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
-        let 
-          overlays = [ (import rust-overlay) ];
-          pkgs = import nixpkgs {
-            inherit system overlays;
-          };
-        in
-        {
-          devShell = pkgs.mkShell {
-             buildInputs = [
-              pkgs.openssl
-              pkgs.pkgconfig
-              pkgs.exa
-              pkgs.fd
-              pkgs.rust-bin.nightly.latest.default
-            ];
+      let 
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
+      in
+      {
+        devShell = pkgs.mkShell {
+        	buildInputs = [
+          	pkgs.openssl
+            pkgs.pkgconfig
+            pkgs.exa
+            pkgs.fd
+            pkgs.rust-bin.nightly.latest.default
+          ];
 
-            shellHook = ''
-              alias ls=exa
-              alias find=fd
-            '';
-          };
-        }
-      );
+          shellHook = ''
+            alias ls=exa
+            alias find=fd
+          '';
+        };
+      }
+    );
 }
 ```
 
