@@ -105,24 +105,9 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
           devShell = pkgs.mkShell {
              buildInputs = [
               pkgs.openssl
-              pkgs.binutils
               pkgs.pkgconfig
-              pkgs.openssl
-              pkgs.openssl.dev
-              pkgs.gcc
-              pkgs.glibc
-              pkgs.gmp.dev
-              pkgs.nixpkgs-fmt
               pkgs.exa
-              pkgs.ripgrep
-              pkgs.watchexec
-              pkgs.tokei
-              pkgs.bat
               pkgs.fd
-              pkgs.terraform
-              pkgs.gperftools
-              pkgs.wrk
-              pkgs.valgrind
               pkgs.rust-bin.nightly.latest.default
             ];
 
