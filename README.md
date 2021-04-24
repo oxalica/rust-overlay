@@ -114,8 +114,6 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
             shellHook = ''
               alias ls=exa
               alias find=fd
-              cargo update 
-              cargo install cargo-watch
             '';
           };
         }
