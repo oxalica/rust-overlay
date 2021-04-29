@@ -137,6 +137,13 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
     # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
     fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
 
+    # Select the latest nightly toolchain which have specific components or profile available.
+    # This helps nightly users in case of latest nightly may not contains all components they want.
+    #
+    # `selectLatestNightlyWith (toolchain: toolchain.default)` selects the latest nightly toolchain
+    # with all `default` components (rustc, cargo, rustfmt, ...) available.
+    selectLatestNightlyWith = selector: «derivation»;
+
     # [Experimental]
     # Custom toolchain from a specific rustc git revision.
     # This does almost the same thing as `rustup-toolchain-install-master`. (https://crates.io/crates/rustup-toolchain-install-master)
@@ -179,6 +186,9 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
     nightly = {
       # The latest nightly toolchain.
+      # It is preferred to use `selectLatestNightlyWith` instead of this since
+      # nightly toolchain may have components (like `rustfmt` or `rls`) missing,
+      # making `default` profile unusable.
       latest = { /* toolchain */ };
       "2020-12-31" = { /* toolchain */ };
       "2020-12-30" = { /* toolchain */ };
@@ -222,6 +232,14 @@ Some examples (assume `nixpkgs` had the overlay applied):
     extensions = [ "rust-src" ];
     targets = [ "arm-unknown-linux-gnueabihf" ];
   }
+  ```
+
+- Select the latest nightly toolchain with default components and `llvm-tools-preview` all available.
+  It may select toolchain earlier than `rust-bin.nightly.latest` due to lack of components.
+  ```nix
+  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+    extensions = [ "llvm-tools-preview" ];
+  })
   ```
 
 - If you already have a [`rust-toolchain` file for rustup][rust-toolchain],

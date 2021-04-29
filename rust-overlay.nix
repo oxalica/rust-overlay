@@ -535,6 +535,28 @@ let
       components = builtins.attrValues components';
     };
 
+  # Select latest nightly toolchain which makes selected profile builds.
+  # Some components are missing in some nightly releases.
+  # Usage:
+  # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = "llvm-tools-preview"; })`
+  selectLatestNightlyWith = selector:
+    let
+      inherit (builtins) attrNames removeAttrs elemAt length trace tryEval;
+      nightlyDates = attrNames (removeAttrs self.rust-bin.nightly [ "latest" ]);
+      dateLength = length nightlyDates;
+      go = idx:
+        let ret = selector (self.rust-bin.nightly.${elemAt nightlyDates idx}); in
+        if idx == 0 then
+          ret
+        else if dateLength - idx >= 256 then
+          trace "Failed to select nightly version after 100 tries" ret
+        else if ret != null && (tryEval ret.drvPath).success then
+          ret
+        else
+          go (idx - 1);
+    in
+      go (length nightlyDates - 1);
+
 in {
   # For each channel:
   #   rust-bin.stable.latest.cargo
@@ -558,6 +580,7 @@ in {
     mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
       inherit fromRustupToolchain fromRustupToolchainFile;
+      inherit selectLatestNightlyWith;
       # Experimental feature.
       inherit fromRustcRev;
     };

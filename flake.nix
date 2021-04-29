@@ -164,7 +164,9 @@
           });
       };
 
-      checkDrvs = {};
+      checkDrvs = lib.optionalAttrs (lib.elem system [ "aarch64-linux" "x86_64-linux" ]) {
+        latest-nightly-default = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+      };
 
       failedAssertions =
         lib.filter (msg: msg != null) (
