@@ -535,29 +535,51 @@ let
       components = builtins.attrValues components';
     };
 
+  # Select latest nightly toolchain which makes selected profile builds.
+  # Some components are missing in some nightly releases.
+  # Usage:
+  # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = "llvm-tools-preview"; })`
+  selectLatestNightlyWith = selector:
+    let
+      inherit (builtins) attrNames removeAttrs elemAt length trace tryEval;
+      nightlyDates = attrNames (removeAttrs self.rust-bin.nightly [ "latest" ]);
+      dateLength = length nightlyDates;
+      go = idx:
+        let ret = selector (self.rust-bin.nightly.${elemAt nightlyDates idx}); in
+        if idx == 0 then
+          ret
+        else if dateLength - idx >= 256 then
+          trace "Failed to select nightly version after 100 tries" ret
+        else if ret != null && (tryEval ret.drvPath).success then
+          ret
+        else
+          go (idx - 1);
+    in
+      go (length nightlyDates - 1);
+
 in {
   # For each channel:
-  #   rust-bin.stable.latest.cargo
-  #   rust-bin.stable.latest.rust   # Aggregate all others. (recommended)
+  #   rust-bin.stable.latest.{minimal,default,complete} # Profiles.
+  #   rust-bin.stable.latest.rust   # Pre-aggregate from upstream.
+  #   rust-bin.stable.latest.cargo  # Components...
   #   rust-bin.stable.latest.rustc
-  #   rust-bin.stable.latest.rust-analysis
   #   rust-bin.stable.latest.rust-docs
-  #   rust-bin.stable.latest.rust-src
-  #   rust-bin.stable.latest.rust-std
+  #   ...
   #
   # For a specific version of stable:
-  #   rust-bin.stable."1.47.0".rust
+  #   rust-bin.stable."1.47.0".default
   #
   # For a specific date of beta:
-  #   rust-bin.beta."2021-01-01".rust
+  #   rust-bin.beta."2021-01-01".default
   #
   # For a specific date of nightly:
-  #   rust-bin.nightly."2020-01-01".rust
+  #   rust-bin.nightly."2020-01-01".default
   rust-bin = with builtins;
     (super.rust-bin or {}) //
     mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
       inherit fromRustupToolchain fromRustupToolchainFile;
+      inherit selectLatestNightlyWith;
       # Experimental feature.
       inherit fromRustcRev;
     };
