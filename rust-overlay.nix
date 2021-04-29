@@ -175,7 +175,7 @@ let
     in
       map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
 
-  mkComponent = { pname, version, src, rustc /* clippy depends on rustc */ }:
+  mkComponent = { pname, version, src, rustc /* some components depend on rustc */ }:
     self.stdenv.mkDerivation {
       inherit pname version src;
 
@@ -231,19 +231,19 @@ let
             done < <(find "$dir" -type f -print0)
           }
           setInterpreter $out
-        '' + optionalString (pname == "clippy-preview") ''
-          if [[ -e "$out/bin/clippy-driver" ]]; then
+        '' + optionalString (pname == "clippy-preview" || pname == "rls-preview") ''
+          for f in $out/bin/*; do
             ${optionalString hostPlatform.isLinux ''
               patchelf \
                 --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
-                "$out/bin/clippy-driver" || true
+                "$f" || true
             ''}
             ${optionalString hostPlatform.isDarwin ''
               install_name_tool \
                 -add_rpath "${rustc}/lib" \
-                "$out/bin/clippy-driver" || true
+                "$f" || true
             ''}
-          fi
+          done
         '' + optionalString (pname == "llvm-tools-preview" && hostPlatform.isLinux) ''
           dir="$out/lib/rustlib/${super.rust.toRustTarget hostPlatform}"
           for f in "$dir"/bin/*; do
