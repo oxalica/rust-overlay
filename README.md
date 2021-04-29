@@ -153,7 +153,6 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
     stable = {
       # The latest stable toolchain.
       latest = {
-        # [Experimental]
         # Profiles, predefined component sets.
         # See: https://rust-lang.github.io/rustup/concepts/profiles.html
         minimal = «derivation»;  # Only `cargo`, `rustc` and `rust-std`.
@@ -211,8 +210,7 @@ Some examples (assume `nixpkgs` had the overlay applied):
 
 - Latest stable/beta/nightly rust with almost all components (provided the same as `mozilla-overlay`):
   `nixpkgs.rust-bin.{stable,beta,nightly}.latest.rust`
-- *\[Experimental\]*
-  Latest stable/beta/nightly rust with `default` or `minimal` profile (provided the same as default behavior of `rustup install`).
+- Latest stable/beta/nightly rust with `default` or `minimal` profile (provided the same as default behavior of `rustup install`).
   `nixpkgs.rust-bin.{stable,beta,nightly}.latest.{default,minimal}`
 
   Note: `default` profile on `nightly` may not always be available due to absense of required components.
