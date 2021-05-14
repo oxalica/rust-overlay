@@ -213,8 +213,8 @@ Some examples (assume `nixpkgs` had the overlay applied):
 - Latest stable/beta/nightly rust with `default` or `minimal` profile (provided the same as default behavior of `rustup install`).
   `nixpkgs.rust-bin.{stable,beta,nightly}.latest.{default,minimal}`
 
-  Note: `default` profile on `nightly` may not always be available due to absense of required components.
-  You can check availability on [Rustup packages availibility](https://rust-lang.github.io/rustup-components-history/).
+  Note: Directly using `nightly.latest.*` is not recommended since your build will fail when
+  some components missing on some days. Use `selectLatestNightlyWith` instead, see example below.
 
 - A specific version of stable rust:
   `nixpkgs.rust-bin.stable."1.48.0".default`
