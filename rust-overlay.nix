@@ -299,14 +299,17 @@ let
         # Need to do it manually.
         mkdir -p "$out/nix-support"
         echo "$propagatedBuildInputs" > "$out/nix-support/propagated-build-inputs"
-        if [[ -n "$depsTargetTargetPropagated" ]]; then
-          echo "$depsTargetTargetPropagated" > "$out/nix-support/propagated-target-target-deps"
+        if [[ -n "$propagatedNativeBuildInputs" ]]; then
+          echo "$propagatedNativeBuildInputs" > "$out/nix-support/propagated-native-build-inputs"
         fi
       '';
 
       # FIXME: If these propagated dependencies go components, darwin build will fail with "`-liconv` not found".
-      propagatedBuildInputs = [ self.stdenv.cc ];
-      depsTargetTargetPropagated =
+
+      # use propagatedNativebuildinputs here because we want these dependencies to end up
+      # as buildPlatform dependencies on the derivation using the compiler even though
+      # they are targetPlatform dependencies from the compiler's perspective
+      propagatedNativeBuildInputs = [ self.stdenv.cc self.targetPackages.stdenv.cc ] ++
         self.lib.optional (self.stdenv.targetPlatform.isDarwin) self.targetPackages.libiconv;
 
       meta.platforms = self.lib.platforms.all;
