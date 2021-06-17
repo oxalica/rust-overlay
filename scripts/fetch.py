@@ -224,11 +224,26 @@ def update_nightly_index(dir=Path('manifests/nightly')):
         f.write('}\n')
 
 def sync_stable_channel(*, stop_if_exists, max_update=None):
-    RELEASES_PAGE_URL = 'https://raw.githubusercontent.com/rust-lang/rust/stable/RELEASES.md'
+    GITHUB_TAGS_URL = 'https://api.github.com/repos/rust-lang/rust/tags'
+    PER_PAGE = 100
 
-    release_page = fetch_url(RELEASES_PAGE_URL).text
-    versions = re.findall(r'(?m)^Version (\d+\.\d+\.\d+) .*$\n========', release_page)
-    versions = [v for v in versions if not version_less(v, MIN_STABLE_VERSION)]
+    versions = []
+    page = 0
+    while True:
+        page += 1
+        print(f'Fetching tags page {page}')
+        resp = fetch_url(
+            GITHUB_TAGS_URL,
+            params={'per_page': PER_PAGE, 'page': page},
+        ).json()
+        versions.extend(
+            tag['name']
+            for tag in resp
+            if RE_STABLE_VERSION.match(tag['name'])
+            and not version_less(tag['name'], MIN_STABLE_VERSION)
+        )
+        if len(resp) < PER_PAGE:
+            break
     versions.sort(key=parse_version, reverse=True)
 
     print(f'Got {len(versions)} releases')
