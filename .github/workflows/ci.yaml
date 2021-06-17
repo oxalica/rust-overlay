@@ -6,9 +6,18 @@ on:
     - master
     - ci
 
+  workflow_run:
+    workflows:
+    - sync-channels
+    types:
+    - completed
+    branches:
+    - master
+
 jobs:
   check-flake:
     name: Check flake
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -27,6 +36,7 @@ jobs:
 
   check-sync-script:
     name: Check sync script
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -74,12 +84,13 @@ jobs:
         done <<<"$short_status"
 
   check-build:
+    name: Check build Rust
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
         channel: [stable, beta]
         build_pkg: [rust, default]
-    name: Check build Rust
     runs-on: ${{ matrix.os }}
     env:
       build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.${{ matrix.build_pkg }}
