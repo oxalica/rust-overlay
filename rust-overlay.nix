@@ -183,7 +183,7 @@ let
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ self.cpio ];
+      nativeBuildInputs = [ self.gnutar ];
 
       installPhase = ''
         runHook preInstall
@@ -191,10 +191,11 @@ let
         if [[ "$installerVersion" != 3 ]]; then
           echo "Unknown installer version: $installerVersion"
         fi
+        mkdir -p "$out"
         while read -r comp; do
           echo "Installing component $comp"
-          # Use cpio with file list instead of forking tons of cp.
-          cut -d: -f2 <"$comp/manifest.in" | cpio --quiet -pdD "$comp" "$out"
+          # We don't want to parse the file and invoking cp in bash due to slow forking.
+          cut -d: -f2 <"$comp/manifest.in" | tar -cf - -C "$comp" --files-from - | tar -xC "$out"
         done <./components
         runHook postInstall
       '';
@@ -250,6 +251,9 @@ let
             patchelf --set-rpath "$dir/lib" "$f" || true
           done
         '';
+
+      # rust-docs only contains tons of html files.
+      dontFixup = pname == "rust-docs";
 
       postFixup = ''
         # Function moves well-known files from etc/
