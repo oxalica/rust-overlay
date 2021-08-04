@@ -91,4 +91,5 @@
   _89 = "x86_64-unknown-cloudabi";
   _90 = "wasm32-unknown-wasi";
   _91 = "x86_64-pc-solaris";
+  _92 = "aarch64-apple-ios-sim";
 }
