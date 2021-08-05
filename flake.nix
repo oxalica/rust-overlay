@@ -93,12 +93,8 @@
 
       assertions = {
         url-no-arch = assertUrl stable."1.48.0".rust-src "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
-        url-kind-2 = assertUrl stable."1.48.0".cargo "https://static.rust-lang.org/dist/2020-11-19/cargo-1.48.0-${rustTarget}.tar.xz";
-        url-kind-0 = assertUrl stable."1.47.0".cargo "https://static.rust-lang.org/dist/2020-10-08/cargo-0.48.0-${rustTarget}.tar.xz";
-        url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustTarget}.tar.xz";
         url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustTarget}.tar.xz";
         url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustTarget}.tar.xz";
-        url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustTarget}.tar.xz";
 
       # Check only tier 1 targets.
       } // lib.optionalAttrs (lib.elem system [ "aarch64-linux" "x86_64-linux" ]) {
@@ -108,6 +104,11 @@
         name-nightly = assertEq nightly."2021-01-01".rustc.name "rustc-1.51.0-nightly-2021-01-01";
         name-stable-profile-default = assertEq stable."1.51.0".default.name "rust-default-1.51.0";
         name-stable-profile-minimal = assertEq stable."1.51.0".minimal.name "rust-minimal-1.51.0";
+
+        url-kind-2 = assertUrl stable."1.48.0".cargo "https://static.rust-lang.org/dist/2020-11-19/cargo-1.48.0-${rustTarget}.tar.xz";
+        url-kind-0 = assertUrl stable."1.47.0".cargo "https://static.rust-lang.org/dist/2020-10-08/cargo-0.48.0-${rustTarget}.tar.xz";
+        url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustTarget}.tar.xz";
+        url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustTarget}.tar.xz";
 
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
         rename-unavailable = {
