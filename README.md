@@ -50,7 +50,7 @@ $ cargo --version
 cargo 1.49.0 (d00d64df9 2020-12-05)
 ```
 
-### Example: NixOS Configuration
+### Flake example: NixOS Configuration
 
 Here's an example of using it in nixos configuration.
 ```nix
@@ -79,7 +79,7 @@ Here's an example of using it in nixos configuration.
 }
 ```
 
-### Example: Using `devShell` and `nix develop`
+### Flake example: Using `devShell` and `nix develop`
 
 Running `nix develop` will create a shell with the default nightly Rust toolchain installed:
 
@@ -95,20 +95,21 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
   outputs = { self, nixpkgs, rust-overlay, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
-      let 
+      let
         overlays = [ (import rust-overlay) ];
         pkgs = import nixpkgs {
           inherit system overlays;
         };
       in
+      with pkgs;
       {
-        devShell = pkgs.mkShell {
+        devShell = mkShell {
           buildInputs = [
-            pkgs.openssl
-            pkgs.pkgconfig
-            pkgs.exa
-            pkgs.fd
-            pkgs.rust-bin.nightly.latest.default
+            openssl
+            pkgconfig
+            exa
+            fd
+            rust-bin.nightly.latest.default
           ];
 
           shellHook = ''
@@ -122,7 +123,85 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
 ```
 
-## Attributes provided by the overlay
+## Usage Examples
+
+- Latest stable or beta rust profile.
+
+  ```nix
+  rust-bin.stable.latest.default # Stable rust, default profile. If not sure, always choose this.
+  rust-bin.beta.latest.default   # Wanna test beta compiler.
+  rust-bin.stable.latest.minimal # I don't need anything other than rustc, cargo, rust-std. Bye rustfmt, clippy, etc.
+  rust-bin.beta.latest.minimal
+  ```
+
+  It provices the same components as which installed by `rustup install`'s `default` or `minimal` profiles.
+
+  Almost always, `default` is what you want for development.
+
+  *Note: For difference between `default` and `minimal` profiles, see
+  [rustup - Profiles][rust-profiles]*
+
+- Latest stable or beta rust profile, **with extra components or target support**.
+
+  ```nix
+  rust-bin.stable.latest.default.override {
+    extensions = [ "rust-src" ];
+    targets = [ "arm-unknown-linux-gnueabihf" ];
+  }
+  ```
+
+- Latest **nightly** rust profile.
+
+  ```nix
+  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default) # or `toolchain.minimal`
+  ```
+
+  *Note: Don't use `rust-bin.nightly.latest`. Your build would fail when some components missing on some days.
+  Always use `selectLatestNightlyWith` instead.*
+
+- Latest **nightly** rust profile, **with extra components or target support**.
+
+  ```nix
+  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+    extensions = [ "rust-src" ];
+    targets = [ "arm-unknown-linux-gnueabihf" ];
+  })
+  ```
+
+- A specific version of rust:
+  ```nix
+  rust-bin.stable."1.48.0".default
+  rust-bin.beta."2021-01-01".default
+  rust-bin.nightly."2020-12-31".default
+  ```
+
+  *Note: All of them are `override`-able like examples above.*
+
+- If you already have a [`rust-toolchain` file for rustup][rust-toolchain],
+  you can simply use `fromRustupToolchainFile` to get the customized toolchain derivation.
+
+  ```nix
+  rust-bin.fromRustupToolchainFile ./rust-toolchain
+  ```
+
+- Toolchain with specific rustc git revision.
+
+  **Warning: This may not always work (including the example below) since upstream CI periodly purges old artifacts.**
+
+  This is useful for development of rust components like [MIRI][miri], which requires a specific revision of rust.
+  ```nix
+  rust-bin.fromRustcRev {
+    rev = "a2cd91ceb0f156cb442d75e12dc77c3d064cdde4";
+    components = {
+      rustc = "sha256-x+OkPVStX00AiC3GupIdGzWluIK1BnI4ZCBbg72+ZuI=";
+      rust-src = "sha256-13PpzzYtd769Xkb0QzHpNfYCOnLMWFolc9QyYq98z2k=";
+    };
+  }
+  ```
+
+- There also an cross-compilation example in [`examples/cross-aarch64`].
+
+## Reference: All attributes provided by the overlay
 
 ```nix
 {
@@ -144,11 +223,10 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
     # with all `default` components (rustc, cargo, rustfmt, ...) available.
     selectLatestNightlyWith = selector: «derivation»;
 
-    # [Experimental]
     # Custom toolchain from a specific rustc git revision.
     # This does almost the same thing as `rustup-toolchain-install-master`. (https://crates.io/crates/rustup-toolchain-install-master)
     # Parameter `components` should be an attrset with component name as key and its SRI hash as value.
-    fromRustcRev = { pname ? .., rev, components, target ? .. }: «derivation»;
+    fromRustcRev = { pname ? …, rev, components, target ? … }: «derivation»;
 
     stable = {
       # The latest stable toolchain.
@@ -206,64 +284,10 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 }
 ```
 
-Some examples (assume `nixpkgs` had the overlay applied):
-
-- Latest stable/beta/nightly rust with almost all components (provided the same as `mozilla-overlay`):
-  `nixpkgs.rust-bin.{stable,beta,nightly}.latest.rust`
-- Latest stable/beta/nightly rust with `default` or `minimal` profile (provided the same as default behavior of `rustup install`).
-  `nixpkgs.rust-bin.{stable,beta,nightly}.latest.{default,minimal}`
-
-  Note: Directly using `nightly.latest.*` is not recommended since your build will fail when
-  some components missing on some days. Use `selectLatestNightlyWith` instead, see example below.
-
-- A specific version of stable rust:
-  `nixpkgs.rust-bin.stable."1.48.0".default`
-- A specific date of beta rust:
-  `nixpkgs.rust-bin.beta."2021-01-01".default`
-- A specific date of nightly rust:
-  `nixpkgs.rust-bin.nightly."2020-12-31".default`
-- Latest stable rust with additional component `rust-src` and extra target
-  `arm-unknown-linux-gnueabihf`:
-
-  ```nix
-  nixpkgs.rust-bin.stable.latest.default.override {
-    extensions = [ "rust-src" ];
-    targets = [ "arm-unknown-linux-gnueabihf" ];
-  }
-  ```
-
-- Select the latest nightly toolchain with default components and `llvm-tools-preview` all available.
-  It may select toolchain earlier than `rust-bin.nightly.latest` due to lack of components.
-  ```nix
-  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
-    extensions = [ "llvm-tools-preview" ];
-  })
-  ```
-
-- If you already have a [`rust-toolchain` file for rustup][rust-toolchain],
-  you can simply use `fromRustupToolchainFile` to get the customized toolchain derivation.
-
-  ```nix
-  nixpkgs.rust-bin.fromRustupToolchainFile ./rust-toolchain
-  ```
-
-- *\[Experimental\]*
-  Toolchain with specific rustc git revision.
-  This is useful for development of rust components like [MIRI](https://github.com/rust-lang/miri).
-  Note: the example below may not built since upstream CI periodly removes old artifacts.
-  ```nix
-  rust-bin.fromRustcRev {
-    rev = "a2cd91ceb0f156cb442d75e12dc77c3d064cdde4";
-    components = {
-      rustc = "sha256-x+OkPVStX00AiC3GupIdGzWluIK1BnI4ZCBbg72+ZuI=";
-      rust-src = "sha256-13PpzzYtd769Xkb0QzHpNfYCOnLMWFolc9QyYq98z2k=";
-    };
-  }
-  ```
-
-- See more examples in directory `examples`.
-
 For more details, see also the source code of `./rust-overlay.nix`.
 
 [mozilla]: https://github.com/mozilla/nixpkgs-mozilla
 [rust-toolchain]: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
+[rust-profiles]: https://rust-lang.github.io/rustup/concepts/profiles.html
+[miri]: https://github.com/rust-lang/miri
+[`examples/cross-aarch64`]: https://github.com/oxalica/rust-overlay/tree/master/examples/cross-aarch64

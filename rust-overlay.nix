@@ -587,7 +587,6 @@ in {
     {
       inherit fromRustupToolchain fromRustupToolchainFile;
       inherit selectLatestNightlyWith;
-      # Experimental feature.
       inherit fromRustcRev;
     };
 
