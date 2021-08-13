@@ -203,7 +203,7 @@ let
       # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
       preFixup =
         let
-          inherit (super.lib) optionalString;
+          inherit (super.lib) optionalString elem;
           inherit (self.stdenv) hostPlatform;
         in
         optionalString hostPlatform.isLinux ''
@@ -232,7 +232,7 @@ let
             done < <(find "$dir" -type f -print0)
           }
           setInterpreter $out
-        '' + optionalString (pname == "clippy-preview" || pname == "rls-preview") ''
+        '' + optionalString (elem pname ["clippy-preview" "rls-preview" "miri-preview"]) ''
           for f in $out/bin/*; do
             ${optionalString hostPlatform.isLinux ''
               patchelf \
@@ -283,19 +283,19 @@ let
         # If rustc or rustdoc is in the derivation, we need to copy their
         # executable into the final derivation. This is required
         # for making them find the correct SYSROOT.
-        for target in $out/bin/{rustc,rustdoc,miri}; do
+        for target in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
           if [ -e $target ]; then
             cp --remove-destination "$(realpath -e $target)" $target
           fi
         done
 
         if [ -e $out/bin/cargo-miri ]; then
-          cargo_miri=$(readlink $out/bin/cargo-miri)
+          mv $out/bin/{cargo-miri,.cargo-miri-wrapped}
           cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri
           chmod +w $out/bin/cargo-miri
           substituteInPlace $out/bin/cargo-miri \
             --replace "@bash@" "${self.pkgs.bash}/bin/bash" \
-            --replace "@miri@" "$cargo_miri" \
+            --replace "@cargo_miri@" "$out/bin/.cargo-miri-wrapped" \
             --replace "@out@" "$out"
         fi
 

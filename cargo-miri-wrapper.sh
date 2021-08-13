@@ -8,4 +8,4 @@ if [[ ! -v XARGO_RUST_SRC ]]; then
     fi
     export XARGO_RUST_SRC="$src_dir"
 fi
-exec -a "$0" "@miri@" "$@"
+exec -a "$0" "@cargo_miri@" "$@"
