@@ -9,15 +9,26 @@ let
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
     inherit (self.rust-bin) manifests;
-    inherit (builtins) match elemAt;
+    inherit (builtins) match elemAt compareVersions attrNames foldl' filter;
+    inherit (self.lib) hasPrefix;
 
     assertWith = cond: msg: body: if cond then body else throw msg;
 
-    asVersion = match "[0-9]+\\.[0-9]+\\.[0-9]+" channel;
+    # https://rust-lang.github.io/rustup/concepts/toolchains.html#toolchain-specification
+    # <channel> = stable|beta|nightly|<major.minor>|<major.minor.patch>
+
+    asVersion = match "[0-9]+\\.[0-9]+(\\.[0-9]+)?" channel;
     asNightlyDate = let m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel; in
       if m == null then null else elemAt m 0;
     asBetaDate = let m = match "beta-([0-9]+-[0-9]+-[0-9]+)" channel; in
       if m == null then null else elemAt m 0;
+
+    maxWith = zero: f: foldl' (lhs: rhs: if lhs == zero || f lhs rhs < 0 then rhs else lhs) zero;
+
+    latestStableWithMajorMinor =
+      maxWith "" compareVersions
+        (filter (hasPrefix (channel + "."))
+          (attrNames manifests.stable));
 
   in
     # "stable"
@@ -30,10 +41,15 @@ let
     # "beta"
     else if channel == "beta" then
       manifests.beta.${if date != null then date else "latest"} or (throw "Beta ${date} is not available")
-    # "1.49.0"
+    # "1.49.0" or "1.49"
     else if asVersion != null then
-      assertWith (date == null) "Stable version with specific date is not supported"
-        manifests.stable.${channel} or (throw "Stable ${channel} is not available")
+      assertWith (date == null) "Stable version with specific date is not supported" (
+        # "1.49"
+        if asVersion == [ null ] then
+          manifests.stable.${latestStableWithMajorMinor} or (throw "No stable ${channel}.* is available")
+        # "1.49.0"
+        else
+          manifests.stable.${channel} or (throw "Stable ${channel} is not available"))
     # "beta-2021-01-01"
     else if asBetaDate != null then
       assertWith (date == null) "Cannot specify date in both `channel` and `date`"
