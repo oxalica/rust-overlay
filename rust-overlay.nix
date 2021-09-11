@@ -326,10 +326,9 @@ let
 
       # FIXME: If these propagated dependencies go components, darwin build will fail with "`-liconv` not found".
 
-      # use propagatedNativebuildinputs here because we want these dependencies to end up
-      # as buildPlatform dependencies on the derivation using the compiler even though
-      # they are targetPlatform dependencies from the compiler's perspective
-      propagatedNativeBuildInputs = [ self.stdenv.cc self.targetPackages.stdenv.cc ] ++
+      # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
+      # they are offset 0 propagated.
+      propagatedBuildInputs = [ self.gcc self.buildPackages.gcc ] ++
         self.lib.optional (self.stdenv.targetPlatform.isDarwin) self.targetPackages.libiconv;
 
       meta.platforms = self.lib.platforms.all;
