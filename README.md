@@ -134,7 +134,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
   rust-bin.beta.latest.minimal
   ```
 
-  It provices the same components as which installed by `rustup install`'s `default` or `minimal` profiles.
+  It provides the same components as which installed by `rustup install`'s `default` or `minimal` profiles.
 
   Almost always, `default` is what you want for development.
 
