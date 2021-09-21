@@ -201,6 +201,14 @@ let
 
       nativeBuildInputs = [ self.gnutar ];
 
+      # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
+      # they are offset 0 propagated.
+      propagatedBuildInputs =
+        self.lib.optional (pname == "rustc") [ self.stdenv.cc self.buildPackages.stdenv.cc ];
+      # This goes downstream packages' buildInputs.
+      depsTargetTargetPropagated =
+        self.lib.optional (pname == "rustc" && self.stdenv.targetPlatform.isDarwin) self.libiconv;
+
       installPhase = ''
         runHook preInstall
         installerVersion=$(< ./rust-installer-version)
@@ -314,22 +322,7 @@ let
             --replace "@cargo_miri@" "$out/bin/.cargo-miri-wrapped" \
             --replace "@out@" "$out"
         fi
-
-        # `symlinkJoin` (`runCommand`) doesn't handle propagated dependencies.
-        # Need to do it manually.
-        mkdir -p "$out/nix-support"
-        echo "$propagatedBuildInputs" > "$out/nix-support/propagated-build-inputs"
-        if [[ -n "$propagatedNativeBuildInputs" ]]; then
-          echo "$propagatedNativeBuildInputs" > "$out/nix-support/propagated-native-build-inputs"
-        fi
       '';
-
-      # FIXME: If these propagated dependencies go components, darwin build will fail with "`-liconv` not found".
-
-      # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
-      # they are offset 0 propagated.
-      propagatedBuildInputs = [ self.gcc self.buildPackages.gcc ] ++
-        self.lib.optional (self.stdenv.targetPlatform.isDarwin) self.targetPackages.libiconv;
 
       meta.platforms = self.lib.platforms.all;
     };
