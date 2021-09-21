@@ -92,7 +92,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest]
         channel: [stable, beta]
-        build_pkg: [rust, default]
+        build_pkg: [minimal, default]
     runs-on: ${{ matrix.os }}
     env:
       build_expr: (import <nixpkgs> { overlays = [ (import ./.) ]; }).rust-bin.${{ matrix.channel }}.latest.${{ matrix.build_pkg }}
@@ -136,7 +136,7 @@ jobs:
         nix-shell -p "$build_expr" --pure --command "rustc test.rs -o test"
         [[ "$(./test)" == "hello, world" ]]
     - name: Check `clippy` works
-      if: steps.cache-drv-status.outputs.cache-hit != 'true'
+      if: matrix.build_pkg == 'default' && steps.cache-drv-status.outputs.cache-hit != 'true'
       run: |
         echo 'fn main() { loop { break; } }' >./test.rs
         nix-shell -p "$build_expr" --pure --command 'clippy-driver test.rs -W clippy::never-loop' 2>&1 | tee msg
