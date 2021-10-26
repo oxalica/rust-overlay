@@ -84,8 +84,7 @@ let
 
     profiles = if p == null
       then {}
-      # `rust-mingw` is in each profile but doesn't support platforms other than Windows.
-      else mapAttrs (name: remove "rust-mingw") (elemAt profilesList p);
+      else elemAt profilesList p;
 
     targetComponentsList = [
       "rust-std"

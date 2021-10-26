@@ -334,49 +334,88 @@ let
   # `name` is only used for error message.
   #
   # Returns a list of component derivations, or throw if failed.
-  resolveComponents = { name, componentSet, targetComponentsList, extensions, targets, targetExtensions }:
+  resolveComponents =
+    { name
+    , componentSet
+    , targetComponentsList
+    , profileComponents
+    , extensions
+    , targets
+    , targetExtensions
+    }:
     let
       inherit (self.lib) flatten elem isString filter any remove concatStringsSep concatMapStrings attrNames;
       rustHostPlatform = self.rust.toRustTarget self.stdenv.hostPlatform;
 
-      collectComponentTargets = compName: comp:
+      collectComponentTargets = allowMissing: compName: comp:
+        # Fail fast when missing extension.
+        if isString comp then
+          comp
         # Platform irrelevent components like `rust-src`.
-        if comp ? "*" then
+        else if comp ? "*" then
           comp."*"
         # Components for target platform like `rust-std`.
         else if elem compName targetComponentsList then
-          collectTargetComponentTargets compName comp
+          collectTargetComponentTargets allowMissing compName comp
         # Components for host platform like `rustc`.
         else
-          comp.${rustHostPlatform} or "Host component `${compName}` doesn't support target `${rustHostPlatform}`";
+          comp.${rustHostPlatform} or (
+            if allowMissing then []
+            else "Host component `${compName}` doesn't support target `${rustHostPlatform}`");
 
-      collectTargetComponentTargets = compName: comp:
+      collectTargetComponentTargets = allowMissing: compName: comp:
         let selected = remove null (map (tgt: comp.${tgt} or null) targets); in
-        if selected == []
-          then throw "Extension `${compName}` doesn't support any of targets: ${concatStringsSep ", " targets}"
-          else selected;
+        if !allowMissing -> selected != [] then
+          selected
+        else
+          "Extension `${compName}` doesn't support any of targets: ${concatStringsSep ", " targets}";
 
-      collectComponents = name: collectComponentTargets name (componentSet.${name} or "Missing extension `${name}`");
-      collectTargetComponents = name: collectTargetComponentTargets name (componentSet.${name} or "Missing target extension `${name}`");
+      collectComponents = allowMissing: name:
+        collectComponentTargets allowMissing name (componentSet.${name} or "Missing extension `${name}`");
+      collectTargetComponents = name:
+        collectTargetComponentTargets false name (componentSet.${name} or "Missing target extension `${name}`");
 
+      # Profile components can be skipped silently when missing.
+      # Eg. `rust-mingw` on non-Windows platforms, or `rust-docs` on non-tier1 platforms.
       result =
-        flatten (map collectComponents extensions) ++
+        flatten (map (collectComponents true) profileComponents) ++
+        flatten (map (collectComponents false) extensions) ++
         flatten (map collectTargetComponents targetExtensions);
 
       isTargetUnused = target:
         !any (name: componentSet ? ${name}.${target})
-          (filter (name: elem name targetComponentsList) extensions ++ targetExtensions);
+          (filter (name: elem name targetComponentsList)
+            (profileComponents ++ extensions)
+          ++ targetExtensions);
 
       errors = filter isString result ++
         map (tgt: "Target `${tgt}` is not supported by any components or extensions")
           (filter isTargetUnused targets);
 
+      allComponents = attrNames componentSet;
+      availableComponentsFor = host:
+        let
+          comps =
+            filter
+              (name: componentSet.${name} ? ${host})
+              allComponents;
+        in
+          if comps == [] then "<empty>" else comps;
+
+      notes = [
+        "note: all extensions are: ${toString allComponents}"
+      ] ++ map (host:
+        "note: extensions available for ${host} are: ${toString (availableComponentsFor host)}"
+      ) targets ++ [
+        "note: Check here to see whether a component is available for rustup:
+          https://rust-lang.github.io/rustup-components-history"
+      ];
+
     in
       if errors == [] then result
       else throw ''
         Component resolution failed for ${name}
-        - note: available extensions are ${concatStringsSep ", " (attrNames componentSet)}
-        ${concatMapStrings (msg: "- ${msg}\n") errors}
+        ${concatMapStrings (msg: "- ${msg}\n") (errors ++ notes)}
       '';
 
   # Genereate the toolchain set from a parsed manifest.
@@ -462,20 +501,20 @@ let
     ) (removeAttrs manifest.pkg ["rust"]) //
     mapAttrs (name: { to }: componentSet.${to}) manifest.renames;
 
-    mkProfile = name: componentNames:
+    mkProfile = name: profileComponents:
       makeOverridable ({ extensions, targets, targetExtensions }:
         aggregateComponents {
           pname = "rust-${name}";
           version = manifest.version;
           components = resolveComponents {
             name = "rust-${name}-${manifest.version}";
-            inherit componentSet;
+            inherit componentSet profileComponents;
             inherit (manifest) targetComponentsList;
-            extensions = componentNames ++ extensions;
-            targets = [
+            extensions = extensions;
+            targets = self.lib.unique ([
               (toRustTarget self.stdenv.hostPlatform) # Build script requires host std.
               (toRustTarget self.stdenv.targetPlatform)
-            ] ++ targets;
+            ] ++ targets);
             inherit targetExtensions;
           };
         }
