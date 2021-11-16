@@ -6,6 +6,13 @@ self: super:
 
 let
 
+  # FIXME: https://github.com/NixOS/nixpkgs/pull/146274
+  toRustTarget = platform:
+    if platform.isWasi then
+      "${platform.parsed.cpu.name}-wasi"
+    else
+      self.rust.toRustTarget platform;
+
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
     inherit (self.rust-bin) manifests;
@@ -99,7 +106,7 @@ let
   getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
     let
       pkg = pkgs.${pkgname};
-      srcInfo = pkg.target.${super.rust.toRustTarget stdenv.targetPlatform} or pkg.target."*";
+      srcInfo = pkg.target.${toRustTarget stdenv.targetPlatform} or pkg.target."*";
       components = srcInfo.components or [];
       componentNamesList =
         builtins.map (pkg: pkg.pkg) (builtins.filter (pkg: (pkg.target != "*")) components);
@@ -110,7 +117,7 @@ let
     let
       inherit (super.lib) unique;
       pkg = pkgs.${pkgname};
-      rustTarget = super.rust.toRustTarget stdenv.targetPlatform;
+      rustTarget = toRustTarget stdenv.targetPlatform;
       srcInfo = pkg.target.${rustTarget} or pkg.target."*" or (throw "${pkgname} is no available");
       extensions = srcInfo.extensions or [];
       extensionNamesList = unique (builtins.map (pkg: pkg.pkg) extensions);
@@ -179,7 +186,7 @@ let
       inherit (super.lib) flatten remove subtractLists unique;
       targetExtensionsToInstall = checkMissingExtensions pkgs pkgname stdenv targetExtensions;
       extensionsToInstall = checkMissingExtensions pkgs pkgname stdenv extensions;
-      hostTargets = [ "*" (super.rust.toRustTarget stdenv.hostPlatform) (super.rust.toRustTarget stdenv.targetPlatform) ];
+      hostTargets = [ "*" (toRustTarget stdenv.hostPlatform) (toRustTarget stdenv.targetPlatform) ];
       pkgTuples = flatten (getTargetPkgTuples pkgs pkgname hostTargets targets stdenv);
       extensionTuples = flatten (map (name: getTargetPkgTuples pkgs name hostTargets targets stdenv) extensionsToInstall);
       targetExtensionTuples = flatten (map (name: getTargetPkgTuples pkgs name targets targets stdenv) targetExtensionsToInstall);
@@ -270,7 +277,7 @@ let
             ''}
           done
         '' + optionalString (pname == "llvm-tools-preview" && hostPlatform.isLinux) ''
-          dir="$out/lib/rustlib/${super.rust.toRustTarget hostPlatform}"
+          dir="$out/lib/rustlib/${toRustTarget hostPlatform}"
           for f in "$dir"/bin/*; do
             patchelf --set-rpath "$dir/lib" "$f" || true
           done
@@ -345,7 +352,7 @@ let
     }:
     let
       inherit (self.lib) flatten elem isString filter any remove concatStringsSep concatMapStrings attrNames;
-      rustHostPlatform = self.rust.toRustTarget self.stdenv.hostPlatform;
+      rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
 
       collectComponentTargets = allowMissing: compName: comp:
         # Fail fast when missing extension.
@@ -452,7 +459,6 @@ let
     inherit (builtins) elemAt;
     inherit (super) makeOverridable;
     inherit (super.lib) flip mapAttrs;
-    inherit (super.rust) toRustTarget;
 
     maybeRename = name: manifest.renames.${name}.to or name;
 
@@ -568,7 +574,7 @@ let
     # Attrset with component name as key and its SRI hash as value.
     components,
     # Rust target to download.
-    target ? super.rust.toRustTarget self.stdenv.targetPlatform
+    target ? toRustTarget self.stdenv.targetPlatform
   }: let
     shortRev = builtins.substring 0 7 rev;
     components' = super.lib.mapAttrs (compName: hash: mkComponent {
