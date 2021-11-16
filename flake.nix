@@ -81,7 +81,7 @@
       inherit (pkgs) rust-bin rustChannelOf;
       inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
 
-      rustTarget = pkgs.rust.toRustTarget pkgs.hostPlatform;
+      rustTarget = pkgs.rust.toRustTarget pkgs.buildPlatform;
 
       assertEq = lhs: rhs: {
         assertion = lhs == rhs;

@@ -99,7 +99,7 @@ let
   getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
     let
       pkg = pkgs.${pkgname};
-      srcInfo = pkg.target.${super.rust.toRustTarget stdenv.targetPlatform} or pkg.target."*";
+      srcInfo = pkg.target.${super.rust.toRustTarget stdenv.hostPlatform} or pkg.target."*";
       components = srcInfo.components or [];
       componentNamesList =
         builtins.map (pkg: pkg.pkg) (builtins.filter (pkg: (pkg.target != "*")) components);
@@ -110,7 +110,7 @@ let
     let
       inherit (super.lib) unique;
       pkg = pkgs.${pkgname};
-      rustTarget = super.rust.toRustTarget stdenv.targetPlatform;
+      rustTarget = super.rust.toRustTarget stdenv.hostPlatform;
       srcInfo = pkg.target.${rustTarget} or pkg.target."*" or (throw "${pkgname} is no available");
       extensions = srcInfo.extensions or [];
       extensionNamesList = unique (builtins.map (pkg: pkg.pkg) extensions);
@@ -179,7 +179,7 @@ let
       inherit (super.lib) flatten remove subtractLists unique;
       targetExtensionsToInstall = checkMissingExtensions pkgs pkgname stdenv targetExtensions;
       extensionsToInstall = checkMissingExtensions pkgs pkgname stdenv extensions;
-      hostTargets = [ "*" (super.rust.toRustTarget stdenv.hostPlatform) (super.rust.toRustTarget stdenv.targetPlatform) ];
+      hostTargets = [ "*" (super.rust.toRustTarget stdenv.buildPlatform) (super.rust.toRustTarget stdenv.hostPlatform) ];
       pkgTuples = flatten (getTargetPkgTuples pkgs pkgname hostTargets targets stdenv);
       extensionTuples = flatten (map (name: getTargetPkgTuples pkgs name hostTargets targets stdenv) extensionsToInstall);
       targetExtensionTuples = flatten (map (name: getTargetPkgTuples pkgs name targets targets stdenv) targetExtensionsToInstall);
@@ -206,8 +206,8 @@ let
       propagatedBuildInputs =
         self.lib.optional (pname == "rustc") [ self.stdenv.cc self.buildPackages.stdenv.cc ];
       # This goes downstream packages' buildInputs.
-      depsTargetTargetPropagated =
-        self.lib.optional (pname == "rustc" && self.stdenv.targetPlatform.isDarwin) self.libiconv;
+      depsBuildHostPropagated =
+        self.lib.optional (pname == "rustc" && self.stdenv.hostPlatform.isDarwin) self.libiconv;
 
       installPhase = ''
         runHook preInstall
@@ -228,9 +228,9 @@ let
       preFixup =
         let
           inherit (super.lib) optionalString elem;
-          inherit (self.stdenv) hostPlatform;
+          inherit (self.stdenv) buildPlatform;
         in
-        optionalString hostPlatform.isLinux ''
+        optionalString buildPlatform.isLinux ''
           setInterpreter() {
             local dir="$1"
             [ -e "$dir" ] || return 0
@@ -257,21 +257,21 @@ let
           }
           setInterpreter $out
         '' + optionalString (elem pname ["clippy-preview" "rls-preview" "miri-preview"]) ''
-          for f in $out/bin/*; do
-            ${optionalString hostPlatform.isLinux ''
+            for f in "${out}/bin/*"; do
+            ${optionalString buildPlatform.isLinux ''
               patchelf \
                 --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
                 "$f" || true
             ''}
-            ${optionalString hostPlatform.isDarwin ''
+            ${optionalString buildPlatform.isDarwin ''
               install_name_tool \
                 -add_rpath "${rustc}/lib" \
                 "$f" || true
             ''}
           done
-        '' + optionalString (pname == "llvm-tools-preview" && hostPlatform.isLinux) ''
-          dir="$out/lib/rustlib/${super.rust.toRustTarget hostPlatform}"
-          for f in "$dir"/bin/*; do
+        '' + optionalString (pname == "llvm-tools-preview" && buildPlatform.isLinux) ''
+          dir="$out/lib/rustlib/${super.rust.toRustTarget buildPlatform}"
+            for f in "${dir}/bin/*"; do
             patchelf --set-rpath "$dir/lib" "$f" || true
           done
         '';
@@ -345,7 +345,7 @@ let
     }:
     let
       inherit (self.lib) flatten elem isString filter any remove concatStringsSep concatMapStrings attrNames;
-      rustHostPlatform = self.rust.toRustTarget self.stdenv.hostPlatform;
+      rustHostPlatform = self.rust.toRustTarget self.stdenv.buildPlatform;
 
       collectComponentTargets = allowMissing: compName: comp:
         # Fail fast when missing extension.
@@ -512,8 +512,8 @@ let
             inherit (manifest) targetComponentsList;
             extensions = extensions;
             targets = self.lib.unique ([
-              (toRustTarget self.stdenv.hostPlatform) # Build script requires host std.
-              (toRustTarget self.stdenv.targetPlatform)
+              (toRustTarget self.stdenv.buildPlatform) # Build script requires host std.
+              (toRustTarget self.stdenv.hostPlatform)
             ] ++ targets);
             inherit targetExtensions;
           };
@@ -528,7 +528,7 @@ let
 
   in
     # Components.
-    mapAttrs (name: targets: targets."*" or targets.${toRustTarget self.stdenv.hostPlatform} or null) componentSet //
+    mapAttrs (name: targets: targets."*" or targets.${toRustTarget self.stdenv.buildPlatform} or null) componentSet //
     # Profiles.
     profiles //
     {
@@ -568,7 +568,7 @@ let
     # Attrset with component name as key and its SRI hash as value.
     components,
     # Rust target to download.
-    target ? super.rust.toRustTarget self.stdenv.targetPlatform
+    target ? super.rust.toRustTarget self.stdenv.hostPlatform
   }: let
     shortRev = builtins.substring 0 7 rev;
     components' = super.lib.mapAttrs (compName: hash: mkComponent {
