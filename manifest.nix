@@ -1,7 +1,10 @@
 final: prev:
-with (prev.lib);
-with builtins;
 let
+  inherit (builtins) match;
+
+  inherit (final.lib)
+    attrNames concatMap elemAt filter hasAttr mapAttrs mapAttrs' removeSuffix;
+
   targets = import ./manifests/targets.nix // { _ = "*"; };
   renamesList = import ./manifests/renames.nix;
   profilesList = import ./manifests/profiles.nix;
@@ -52,7 +55,7 @@ let
   }@manifest: rec {
 
     # Version used for derivation.
-    version = if builtins.match ".*(nightly|beta).*" v != null
+    version = if match ".*(nightly|beta).*" v != null
       then "${v}-${d}"  # 1.51.0-nightly-2021-01-01, 1.52.0-beta.2-2021-03-27
       else v;           # 1.51.0
 

@@ -10,7 +10,8 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }: let
-    inherit (nixpkgs) lib;
+    inherit (nixpkgs.lib)
+      elem filter filterAttrs head mapAttrs' mapAttrsToList optionalAttrs replaceStrings;
 
     overlay = import ./.;
 
@@ -58,15 +59,15 @@
           null;
 
       result =
-        lib.mapAttrs' (version: comps: {
-          name = "rust-${lib.replaceStrings ["."] ["-"] version}";
+        mapAttrs' (version: comps: {
+          name = "rust-${replaceStrings ["."] ["-"] version}";
           value = defaultPkg comps;
         }) pkgs.rust-bin.stable //
-        lib.mapAttrs' (version: comps: {
+        mapAttrs' (version: comps: {
           name = "rust-nightly-${version}";
           value = defaultPkg comps;
         }) pkgs.rust-bin.nightly //
-        lib.mapAttrs' (version: comps: {
+        mapAttrs' (version: comps: {
           name = "rust-beta-${version}";
           value = defaultPkg comps;
         }) pkgs.rust-bin.beta //
@@ -75,7 +76,7 @@
           rust-nightly = result.rust-nightly-latest;
           rust-beta = result.rust-beta-latest;
         };
-    in lib.filterAttrs (name: drv: drv != null) result;
+    in filterAttrs (name: drv: drv != null) result;
 
     checks = let
       inherit (pkgs) rust-bin rustChannelOf;
@@ -88,7 +89,7 @@
         message = "`${lhs}` != `${rhs}`";
       };
       assertUrl = drv: url: let
-        srcUrl = lib.head drv.src.urls;
+        srcUrl = head drv.src.urls;
       in assertEq srcUrl url;
 
       assertions = {
@@ -97,7 +98,7 @@
         url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustTarget}.tar.xz";
 
       # Check only tier 1 targets.
-      } // lib.optionalAttrs (lib.elem system [ "aarch64-linux" "x86_64-linux" ]) {
+      } // optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
 
         name-stable = assertEq stable."1.48.0".rustc.name "rustc-1.48.0";
         name-beta = assertEq beta."2021-01-01".rustc.name "rustc-1.50.0-beta.2-2021-01-01";
@@ -165,13 +166,13 @@
           });
       };
 
-      checkDrvs = lib.optionalAttrs (lib.elem system [ "aarch64-linux" "x86_64-linux" ]) {
+      checkDrvs = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
         latest-nightly-default = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
       };
 
       failedAssertions =
-        lib.filter (msg: msg != null) (
-          lib.mapAttrsToList
+        filter (msg: msg != null) (
+          mapAttrsToList
           (name: { assertion, message }: if assertion
             then null
             else "Assertion `${name}` failed: ${message}\n")

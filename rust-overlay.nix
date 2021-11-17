@@ -5,6 +5,12 @@
 self: super:
 
 let
+  inherit (builtins) compareVersions fromTOML match readFile tryEval;
+
+  inherit (self.lib)
+    any attrNames attrValues concatMapStrings concatStringsSep elem elemAt filter flatten foldl'
+    hasPrefix head intersectLists isString length makeLibraryPath makeOverridable mapAttrs
+    optional optionalString remove replaceStrings substring subtractLists trace unique;
 
   # FIXME: https://github.com/NixOS/nixpkgs/pull/146274
   toRustTarget = platform:
@@ -16,8 +22,6 @@ let
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
     inherit (self.rust-bin) manifests;
-    inherit (builtins) match elemAt compareVersions attrNames foldl' filter;
-    inherit (self.lib) hasPrefix;
 
     assertWith = cond: msg: body: if cond then body else throw msg;
 
@@ -82,7 +86,7 @@ let
           if toolchain._profiles != {} then
             toolchain._profiles.${profile'} or (throw ''
               Rust ${toolchain._version} doesn't have profile `${profile'}`.
-              Available profiles are: ${self.lib.concatStringsSep ", " (builtins.attrNames toolchain._profiles)}
+              Available profiles are: ${concatStringsSep ", " (attrNames toolchain._profiles)}
             '')
           # Fallback to package `rust` when profiles are not supported and not specified.
           else if profile == null then
@@ -96,7 +100,6 @@ let
 
   # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
   fromRustupToolchainFile = path: let
-    inherit (builtins) readFile match fromTOML head;
     content = readFile path;
     legacy = match "([^\r\n]+)\r?\n?" content;
   in if legacy != null
@@ -109,18 +112,17 @@ let
       srcInfo = pkg.target.${toRustTarget stdenv.targetPlatform} or pkg.target."*";
       components = srcInfo.components or [];
       componentNamesList =
-        builtins.map (pkg: pkg.pkg) (builtins.filter (pkg: (pkg.target != "*")) components);
+        map (pkg: pkg.pkg) (filter (pkg: (pkg.target != "*")) components);
     in
       componentNamesList;
 
   getExtensions = pkgs: pkgname: stdenv:
     let
-      inherit (super.lib) unique;
       pkg = pkgs.${pkgname};
       rustTarget = toRustTarget stdenv.targetPlatform;
       srcInfo = pkg.target.${rustTarget} or pkg.target."*" or (throw "${pkgname} is no available");
       extensions = srcInfo.extensions or [];
-      extensionNamesList = unique (builtins.map (pkg: pkg.pkg) extensions);
+      extensionNamesList = unique (map (pkg: pkg.pkg) extensions);
     in
       extensionNamesList;
 
@@ -128,7 +130,7 @@ let
     pkgs ? ${pkgname}.target.${target};
 
   getTuples = pkgs: name: targets:
-    builtins.map (target: { inherit name target; }) (builtins.filter (target: hasTarget pkgs name target) targets);
+    map (target: { inherit name target; }) (filter (target: hasTarget pkgs name target) targets);
 
   # In the manifest, a package might have different components which are bundled with it, as opposed as the extensions which can be added.
   # By default, a package will include the components for the same architecture, and offers them as extensions for other architectures.
@@ -137,12 +139,10 @@ let
   # The list contains the package for the pkgTargets as well as the packages for components for all compTargets
   getTargetPkgTuples = pkgs: pkgname: pkgTargets: compTargets: stdenv:
     let
-      inherit (builtins) elem;
-      inherit (super.lib) intersectLists;
       components = getComponentsWithFixedPlatform pkgs pkgname stdenv;
       extensions = getExtensions pkgs pkgname stdenv;
       compExtIntersect = intersectLists components extensions;
-      tuples = (getTuples pkgs pkgname pkgTargets) ++ (builtins.map (name: getTuples pkgs name compTargets) compExtIntersect);
+      tuples = (getTuples pkgs pkgname pkgTargets) ++ (map (name: getTuples pkgs name compTargets) compExtIntersect);
     in
       tuples;
 
@@ -158,8 +158,7 @@ let
 
   mkComponentSrc = { url, sha256, fetchurl }:
     let
-      inherit (builtins) match elemAt;
-      url' = builtins.replaceStrings [" "] ["%20"] url; # This is required or download will fail.
+      url' = replaceStrings [" "] ["%20"] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
@@ -168,8 +167,6 @@ let
 
   checkMissingExtensions = pkgs: pkgname: stdenv: extensions:
     let
-      inherit (builtins) head;
-      inherit (super.lib) concatStringsSep subtractLists;
       availableExtensions = getExtensions pkgs pkgname stdenv;
       missingExtensions = subtractLists availableExtensions extensions;
       extensionsToInstall =
@@ -182,8 +179,6 @@ let
 
   getComponents = pkgs: pkgname: targets: extensions: targetExtensions: stdenv: fetchurl:
     let
-      inherit (builtins) head map;
-      inherit (super.lib) flatten remove subtractLists unique;
       targetExtensionsToInstall = checkMissingExtensions pkgs pkgname stdenv targetExtensions;
       extensionsToInstall = checkMissingExtensions pkgs pkgname stdenv extensions;
       hostTargets = [ "*" (toRustTarget stdenv.hostPlatform) (toRustTarget stdenv.targetPlatform) ];
@@ -211,10 +206,10 @@ let
       # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
       # they are offset 0 propagated.
       propagatedBuildInputs =
-        self.lib.optional (pname == "rustc") [ self.stdenv.cc self.buildPackages.stdenv.cc ];
+        optional (pname == "rustc") [ self.stdenv.cc self.buildPackages.stdenv.cc ];
       # This goes downstream packages' buildInputs.
       depsTargetTargetPropagated =
-        self.lib.optional (pname == "rustc" && self.stdenv.targetPlatform.isDarwin) self.libiconv;
+        optional (pname == "rustc" && self.stdenv.targetPlatform.isDarwin) self.libiconv;
 
       installPhase = ''
         runHook preInstall
@@ -234,7 +229,6 @@ let
       # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
       preFixup =
         let
-          inherit (super.lib) optionalString elem;
           inherit (self.stdenv) hostPlatform;
         in
         optionalString hostPlatform.isLinux ''
@@ -252,12 +246,12 @@ let
                 # Handle executables
                 patchelf \
                   --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-                  --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                  --set-rpath "${makeLibraryPath [ self.zlib ]}:$out/lib" \
                   "$i" || true
               else
                 # Handle libraries
                 patchelf \
-                  --set-rpath "${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                  --set-rpath "${makeLibraryPath [ self.zlib ]}:$out/lib" \
                   "$i" || true
               fi
             done < <(find "$dir" -type f -print0)
@@ -267,7 +261,7 @@ let
           for f in $out/bin/*; do
             ${optionalString hostPlatform.isLinux ''
               patchelf \
-                --set-rpath "${rustc}/lib:${super.lib.makeLibraryPath [ self.zlib ]}:$out/lib" \
+                --set-rpath "${rustc}/lib:${makeLibraryPath [ self.zlib ]}:$out/lib" \
                 "$f" || true
             ''}
             ${optionalString hostPlatform.isDarwin ''
@@ -304,7 +298,7 @@ let
     };
 
   aggregateComponents = { pname, version, components }:
-    self.pkgs.symlinkJoin {
+    self.symlinkJoin {
       name = pname + "-" + version;
       inherit pname version;
 
@@ -325,7 +319,7 @@ let
           cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri
           chmod +w $out/bin/cargo-miri
           substituteInPlace $out/bin/cargo-miri \
-            --replace "@bash@" "${self.pkgs.bash}/bin/bash" \
+            --replace "@bash@" "${self.bash}/bin/bash" \
             --replace "@cargo_miri@" "$out/bin/.cargo-miri-wrapped" \
             --replace "@out@" "$out"
         fi
@@ -351,7 +345,6 @@ let
     , targetExtensions
     }:
     let
-      inherit (self.lib) flatten elem isString filter any remove concatStringsSep concatMapStrings attrNames;
       rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
 
       collectComponentTargets = allowMissing: compName: comp:
@@ -456,10 +449,6 @@ let
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
   toolchainFromManifest = manifest: let
-    inherit (builtins) elemAt;
-    inherit (super) makeOverridable;
-    inherit (super.lib) flip mapAttrs;
-
     maybeRename = name: manifest.renames.${name}.to or name;
 
     # For legacy pre-aggregated package `rust`.
@@ -517,7 +506,7 @@ let
             inherit componentSet profileComponents;
             inherit (manifest) targetComponentsList;
             extensions = extensions;
-            targets = self.lib.unique ([
+            targets = unique ([
               (toRustTarget self.stdenv.hostPlatform) # Build script requires host std.
               (toRustTarget self.stdenv.targetPlatform)
             ] ++ targets);
@@ -542,8 +531,8 @@ let
       # It has more components than `default` profile but less than `complete` profile.
       rust =
         let pkg = mkPackage "rust" manifest.pkg.rust; in
-        if builtins.match ".*[.].*[.].*" != null && profiles != {}
-          then builtins.trace ''
+        if match ".*[.].*[.].*" != null && profiles != {}
+          then trace ''
             Rust ${manifest.version}:
             Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
             Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
@@ -558,10 +547,10 @@ let
     };
 
   # Same as `toolchainFromManifest` but read from a manifest file.
-  toolchainFromManifestFile = path: toolchainFromManifest (builtins.fromTOML (builtins.readFile path));
+  toolchainFromManifestFile = path: toolchainFromManifest (fromTOML (readFile path));
 
   # Override all pkgs of a toolchain set.
-  overrideToolchain = attrs: super.lib.mapAttrs (name: pkg: pkg.override attrs);
+  overrideToolchain = attrs: mapAttrs (name: pkg: pkg.override attrs);
 
   # From a git revision of rustc.
   # This does the same thing as crate `rustup-toolchain-install-master`.
@@ -576,8 +565,8 @@ let
     # Rust target to download.
     target ? toRustTarget self.stdenv.targetPlatform
   }: let
-    shortRev = builtins.substring 0 7 rev;
-    components' = super.lib.mapAttrs (compName: hash: mkComponent {
+    shortRev = substring 0 7 rev;
+    components' = mapAttrs (compName: hash: mkComponent {
       pname = compName;
       version = shortRev;
       src = self.fetchurl {
@@ -592,7 +581,7 @@ let
     aggregateComponents {
       inherit pname;
       version = shortRev;
-      components = builtins.attrValues components';
+      components = attrValues components';
     };
 
   # Select latest nightly toolchain which makes selected profile builds.
@@ -601,7 +590,6 @@ let
   # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = "llvm-tools-preview"; })`
   selectLatestNightlyWith = selector:
     let
-      inherit (builtins) attrNames removeAttrs elemAt length trace tryEval;
       nightlyDates = attrNames (removeAttrs self.rust-bin.nightly [ "latest" ]);
       dateLength = length nightlyDates;
       go = idx:
@@ -634,7 +622,7 @@ in {
   #
   # For a specific date of nightly:
   #   rust-bin.nightly."2020-01-01".default
-  rust-bin = with builtins;
+  rust-bin =
     (super.rust-bin or {}) //
     mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
     {
@@ -657,7 +645,7 @@ in {
         Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
         See also README at https://github.com/oxalica/rust-overlay
       '';
-      fromManifestFile = manifestFilePath: { stdenv, fetchurl, patchelf }@deps: builtins.trace ''
+      fromManifestFile = manifestFilePath: { stdenv, fetchurl, patchelf }@deps: trace ''
         `fromManifestFile` is deprecated.
         Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
         See also README at https://github.com/oxalica/rust-overlay
