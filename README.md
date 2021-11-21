@@ -4,17 +4,20 @@
 ![sync-channels](https://github.com/oxalica/rust-overlay/workflows/sync-channels/badge.svg)
 
 *Pure and reproducible* overlay for binary distributed rust toolchains.
-A compatible but better replacement for rust overlay of [mozilla/nixpkgs-mozilla][mozilla].
+A compatible but better replacement for rust overlay of [nixpkgs-mozilla].
 
-Hashes of toolchain components are pre-fetched (and compressed) in tree (`manifests` directory),
-so the evaluation is *pure* and no need to have network (but [nixpkgs-mozilla][mozilla] does).
-It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
+Hashes of toolchain components are pre-fetched in tree, so the evaluation is *pure* and
+no need to have network access. It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
 
 - The toolchain hashes are auto-updated daily using GitHub Actions.
 - Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
-  (which are randomly chosen).
+  (which are randomly picked and may change over time).
 
-## Use as a classic Nix overlay
+For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
+
+## Installation
+
+### Classic Nix overlay
 
 You can put the code below into your `~/.config/nixpkgs/overlays.nix`.
 ```nix
@@ -33,7 +36,7 @@ $ nix-channel --update
 And then feel free to use it anywhere like
 `import <nixpkgs> { overlays = [ (import <rust-overlay>) ]; }` in your nix shell environment.
 
-## Use with Nix Flakes
+### Nix Flakes
 
 This repository already has flake support.
 
@@ -50,7 +53,7 @@ $ cargo --version
 cargo 1.49.0 (d00d64df9 2020-12-05)
 ```
 
-### Flake example: NixOS Configuration
+#### Use in NixOS Configuration
 
 Here's an example of using it in nixos configuration.
 ```nix
@@ -79,7 +82,7 @@ Here's an example of using it in nixos configuration.
 }
 ```
 
-### Flake example: Using `devShell` and `nix develop`
+#### Use in `devShell` for `nix develop`
 
 Running `nix develop` will create a shell with the default nightly Rust toolchain installed:
 
@@ -123,7 +126,17 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
 ```
 
-## Usage Examples
+### Migration from [nixpkgs-mozilla]
+
+1. Change the channel URL to `https://github.com/oxalica/rust-overlay/archive/master.tar.gz`,
+   or flake URL to `github:oxalica/rust-overlay` for Nix Flakes.
+2. Good to go! `latest.*`, `rustChannel*.*` and friends are made compatible with [nixpkgs-mozilla].
+   You don't necessary need to change anything.
+3. You can also optionally change to [the `rust-bin` interface](#cheat-sheet-common-usage-of-rust-bin),
+   which provides more functionality like "latest nightly with specific components available" or
+   "from `rust-toolchain` file". It also has nix-aware cross-compilation support.
+
+## Cheat sheet: common usage of `rust-bin`
 
 - Latest stable or beta rust profile.
 
@@ -186,8 +199,6 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
 
 - Toolchain with specific rustc git revision.
 
-  **Warning: This may not always work (including the example below) since upstream CI periodly purges old artifacts.**
-
   This is useful for development of rust components like [MIRI][miri], which requires a specific revision of rust.
   ```nix
   rust-bin.fromRustcRev {
@@ -199,94 +210,16 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
   }
   ```
 
+  *Warning: This may not always work (including the example below) since upstream CI periodly purges old artifacts.*
+
 - There also an cross-compilation example in [`examples/cross-aarch64`].
 
-## Reference: All attributes provided by the overlay
+## More documentations
 
-```nix
-{
-  rust-bin = {
-    # The default dist url for fetching.
-    # Override it if you want to use a mirror server.
-    distRoot = "https://static.rust-lang.org/dist";
+- [Reference of all public attributes](docs/reference.md)
+- [Cross compilation](docs/cross_compilation.md)
 
-    # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
-    # See: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
-    fromRustupToolchain = { channel, components ? [], targets ? [] }: «derivation»;
-    # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
-    fromRustupToolchainFile = rust-toolchain-file-path: «derivation»;
-
-    # Select the latest nightly toolchain which have specific components or profile available.
-    # This helps nightly users in case of latest nightly may not contains all components they want.
-    #
-    # `selectLatestNightlyWith (toolchain: toolchain.default)` selects the latest nightly toolchain
-    # with all `default` components (rustc, cargo, rustfmt, ...) available.
-    selectLatestNightlyWith = selector: «derivation»;
-
-    # Custom toolchain from a specific rustc git revision.
-    # This does almost the same thing as `rustup-toolchain-install-master`. (https://crates.io/crates/rustup-toolchain-install-master)
-    # Parameter `components` should be an attrset with component name as key and its SRI hash as value.
-    fromRustcRev = { pname ? …, rev, components, target ? … }: «derivation»;
-
-    stable = {
-      # The latest stable toolchain.
-      latest = {
-        # Profiles, predefined component sets.
-        # See: https://rust-lang.github.io/rustup/concepts/profiles.html
-        minimal = «derivation»;  # Only `cargo`, `rustc` and `rust-std`.
-        default = «derivation»;  # The default profile of `rustup`. Good for general use.
-        complete = «derivation»; # Do not use it. It almost always fails.
-
-        # Pre-aggregated package provided by upstream, the most commonly used package in `mozilla-overlay`.
-        # It consists of an uncertain number of components, usually more than the `default` profile of `rustup`
-        # but less than `complete` profile.
-        rust = «derivation»;
-
-        # Individial components.
-        rustc = «derivation»;
-        cargo = «derivation»;
-        rust-std = «derivation»;
-        # ... other components
-      };
-      "1.49.0" = { /* toolchain */ };
-      "1.48.0" = { /* toolchain */ };
-      # ... other versions.
-    };
-
-    beta = {
-      # The latest beta toolchain.
-      latest = { /* toolchain */ };
-      "2021-01-01" = { /* toolchain */ };
-      "2020-12-30" = { /* toolchain */ };
-      # ... other versions.
-    };
-
-    nightly = {
-      # The latest nightly toolchain.
-      # It is preferred to use `selectLatestNightlyWith` instead of this since
-      # nightly toolchain may have components (like `rustfmt` or `rls`) missing,
-      # making `default` profile unusable.
-      latest = { /* toolchain */ };
-      "2020-12-31" = { /* toolchain */ };
-      "2020-12-30" = { /* toolchain */ };
-      # ... other versions.
-    };
-
-    # ... Some internal attributes omitted.
-  };
-
-  # These are for compatibility with nixpkgs-mozilla and
-  # provide same toolchains as `rust-bin.*`.
-  latest.rustChannels = /* ... */;
-  rustChannelOf = /* ... */;
-  rustChannelOfTargets = /* ... */;
-  rustChannels = /* ... */;
-}
-```
-
-For more details, see also the source code of `./rust-overlay.nix`.
-
-[mozilla]: https://github.com/mozilla/nixpkgs-mozilla
+[nixpkgs-mozilla]: https://github.com/mozilla/nixpkgs-mozilla
 [rust-toolchain]: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
 [rust-profiles]: https://rust-lang.github.io/rustup/concepts/profiles.html
 [miri]: https://github.com/rust-lang/miri
