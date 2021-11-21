@@ -137,3 +137,34 @@ jobs:
         set -o pipefail
         nix-shell --pure --argstr profile ${{ matrix.profile }} --command "cargo clippy -- --cap-lints=warn" 2>&1 | tee out
         [[ "$(< out)" == *"warning: this loop never actually loops"* ]]
+
+  test-cross-examples:
+    name: Test cross compilation examples
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        example: [cross-aarch64, cross-wasi]
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+
+    - name: Install Nix
+      uses: cachix/install-nix-action@v16
+      with:
+        nix_path: nixpkgs=channel:nixpkgs-unstable
+
+    - name: Prepare nix-shell
+      run: |
+        cd examples/${{ matrix.example }}
+        nix-shell --pure --command true
+
+    - name: Build and run example
+      run: |
+        cd examples/${{ matrix.example }}
+        set -o pipefail
+        # No --pure since it requires CA cert access for crates downloading.
+        nix-shell --command "make run" | tee out
+        [[ "$(< out)" == *"Hello, world!"* ]]
