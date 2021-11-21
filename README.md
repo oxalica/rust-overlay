@@ -1,7 +1,7 @@
 # rust-overlay
 
-![CI](https://github.com/oxalica/rust-overlay/workflows/CI/badge.svg)
-![sync-channels](https://github.com/oxalica/rust-overlay/workflows/sync-channels/badge.svg)
+[![CI status](https://github.com/oxalica/rust-overlay/workflows/CI/badge.svg)](https://github.com/oxalica/rust-overlay/actions/workflows/ci.yaml)
+[![sync-channels status](https://github.com/oxalica/rust-overlay/workflows/sync-channels/badge.svg)](https://github.com/oxalica/rust-overlay/actions/workflows/sync-channels.yaml)
 
 *Pure and reproducible* overlay for binary distributed rust toolchains.
 A compatible but better replacement for rust overlay of [nixpkgs-mozilla].
