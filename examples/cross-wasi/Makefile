@@ -1,6 +1,6 @@
 # This Makefile is expected to be run inside nix-shell.
 
-CARGO_FLAGS := --target aarch64-unknown-linux-gnu
+CARGO_FLAGS := --target wasm32-wasi
 
 .PHONY: all
 all: Cargo.toml Cargo.lock src/main.rs
