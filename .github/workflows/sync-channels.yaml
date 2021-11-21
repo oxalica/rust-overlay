@@ -12,29 +12,37 @@ jobs:
   sync-channels:
     name: Sync channels and prefetch toolchains
     runs-on: ubuntu-latest
+
     steps:
     - name: Checkout
       uses: actions/checkout@v2
       with:
         ref: master
         persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+
     - name: Install python
       uses: actions/setup-python@v2
       with:
-        python-version: '3.8'
+        python-version: '3.x'
+
     - name: Install python packages
       run: pip3 install -r ./scripts/requirements.txt
+
     - name: Install Nix
-      uses: cachix/install-nix-action@v12
+      uses: cachix/install-nix-action@v16
+
     - name: Sync stable channel
       timeout-minutes: 5
       run: python3 ./scripts/fetch.py stable
+
     - name: Sync beta channel
       timeout-minutes: 5
       run: python3 ./scripts/fetch.py beta
+
     - name: Sync nightly channel
       timeout-minutes: 5
       run: python3 ./scripts/fetch.py nightly
+
     - name: Check and commit changes
       id: commit
       continue-on-error: true
@@ -43,6 +51,7 @@ jobs:
         git config --local user.name "GitHub Action"
         git add manifests
         git commit -m "manifest: update"
+
     - name: Validate nix files changed
       if: steps.commit.outcome == 'success'
       run: |
@@ -51,6 +60,7 @@ jobs:
         if [[ "${#files[*]}" -ne 0 ]]; then
           nix-instantiate --parse "${files[@]}" >/dev/null
         fi
+
     - name: Push changes
       if: steps.commit.outcome == 'success'
       uses: ad-m/github-push-action@master
