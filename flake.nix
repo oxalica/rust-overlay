@@ -11,7 +11,7 @@
 
   outputs = { self, nixpkgs, flake-utils }: let
     inherit (nixpkgs.lib)
-      elem filter filterAttrs head mapAttrs' mapAttrsToList optionalAttrs replaceStrings;
+      elem filter filterAttrs head isDerivation isString mapAttrs' mapAttrsToList optionalAttrs replaceStrings;
 
     overlay = import ./.;
 
@@ -43,33 +43,18 @@
     defaultPackage = packages.rust;
 
     packages = let
-      inherit (builtins) tryEval;
-
-      defaultPkg = comps:
-        if comps ? default then
-          if (tryEval comps.default.drvPath).success then
-            comps.default
-          else if (tryEval comps.minimal.drvPath).success then
-            comps.minimal
-          else
-            null
-        else if (tryEval comps.rust.drvPath).success then
-          comps.rust
-        else
-          null;
-
       result =
         mapAttrs' (version: comps: {
           name = "rust-${replaceStrings ["."] ["-"] version}";
-          value = defaultPkg comps;
+          value = comps.default or null;
         }) pkgs.rust-bin.stable //
         mapAttrs' (version: comps: {
           name = "rust-nightly-${version}";
-          value = defaultPkg comps;
+          value = comps.default or null;
         }) pkgs.rust-bin.nightly //
         mapAttrs' (version: comps: {
           name = "rust-beta-${version}";
-          value = defaultPkg comps;
+          value = comps.default or null;
         }) pkgs.rust-bin.beta //
         {
           rust = result.rust-latest;
@@ -92,13 +77,11 @@
         srcUrl = head drv.src.urls;
       in assertEq srcUrl url;
 
-      assertions = {
+      # Check only tier 1 targets.
+      assertions = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
         url-no-arch = assertUrl stable."1.48.0".rust-src "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
         url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustTarget}.tar.xz";
         url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustTarget}.tar.xz";
-
-      # Check only tier 1 targets.
-      } // optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
 
         name-stable = assertEq stable."1.48.0".rustc.name "rustc-1.48.0";
         name-beta = assertEq beta."2021-01-01".rustc.name "rustc-1.50.0-beta.2-2021-01-01";
@@ -168,6 +151,11 @@
 
       checkDrvs = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
         latest-nightly-default = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+      } // optionalAttrs (system == "aarch64-darwin") {
+        aarch64-darwin-use-x86-docs = rust-bin.stable."1.51.0".default.override {
+          targets = [ "x86_64-apple-darwin" ];
+          targetExtensions = [ "rust-docs" ];
+        };
       };
 
       failedAssertions =

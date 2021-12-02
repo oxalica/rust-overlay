@@ -1,7 +1,4 @@
-# Modified from: https://github.com/mozilla/nixpkgs-mozilla/blob/8c007b60731c07dd7a052cce508de3bb1ae849b4/rust-overlay.nix
-
-# This file provide a Rust overlay, which provides pre-packaged bleeding edge versions of rustc
-# and cargo.
+# Define component resolution, component aggregation and utility functions.
 self: super:
 
 let
@@ -9,8 +6,14 @@ let
 
   inherit (self.lib)
     any attrNames attrValues concatMapStrings concatStringsSep elem elemAt filter flatten foldl'
-    hasPrefix head intersectLists isString length makeLibraryPath makeOverridable mapAttrs
-    optional optionalString remove replaceStrings substring subtractLists trace unique;
+    hasPrefix head intersectLists isString length listToAttrs makeLibraryPath makeOverridable mapAttrs
+    mapAttrsToList optional optionalAttrs optionalString remove replaceStrings substring subtractLists trace unique;
+
+  # Remove keys from attrsets whose value is null.
+  removeNulls = set:
+    removeAttrs set
+      (filter (name: set.${name} == null)
+        (attrNames set));
 
   # FIXME: https://github.com/NixOS/nixpkgs/pull/146274
   toRustTarget = platform:
@@ -18,6 +21,15 @@ let
       "${platform.parsed.cpu.name}-wasi"
     else
       self.rust.toRustTarget platform;
+
+  # The platform where `rustc` is running.
+  rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
+  # The platform of binary which `rustc` produces.
+  rustTargetPlatform = toRustTarget self.stdenv.targetPlatform;
+
+  mkComponentSet = self.callPackage ./mk-component-set.nix {
+    inherit toRustTarget removeNulls;
+  };
 
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
@@ -106,196 +118,14 @@ let
     then fromRustupToolchain { channel = head legacy; }
     else fromRustupToolchain (fromTOML content).toolchain;
 
-  getComponentsWithFixedPlatform = pkgs: pkgname: stdenv:
-    let
-      pkg = pkgs.${pkgname};
-      srcInfo = pkg.target.${toRustTarget stdenv.targetPlatform} or pkg.target."*";
-      components = srcInfo.components or [];
-      componentNamesList =
-        map (pkg: pkg.pkg) (filter (pkg: (pkg.target != "*")) components);
-    in
-      componentNamesList;
-
-  getExtensions = pkgs: pkgname: stdenv:
-    let
-      pkg = pkgs.${pkgname};
-      rustTarget = toRustTarget stdenv.targetPlatform;
-      srcInfo = pkg.target.${rustTarget} or pkg.target."*" or (throw "${pkgname} is no available");
-      extensions = srcInfo.extensions or [];
-      extensionNamesList = unique (map (pkg: pkg.pkg) extensions);
-    in
-      extensionNamesList;
-
-  hasTarget = pkgs: pkgname: target:
-    pkgs ? ${pkgname}.target.${target};
-
-  getTuples = pkgs: name: targets:
-    map (target: { inherit name target; }) (filter (target: hasTarget pkgs name target) targets);
-
-  # In the manifest, a package might have different components which are bundled with it, as opposed as the extensions which can be added.
-  # By default, a package will include the components for the same architecture, and offers them as extensions for other architectures.
-  #
-  # This functions returns a list of { name, target } attribute sets, which includes the current system package, and all its components for the selected targets.
-  # The list contains the package for the pkgTargets as well as the packages for components for all compTargets
-  getTargetPkgTuples = pkgs: pkgname: pkgTargets: compTargets: stdenv:
-    let
-      components = getComponentsWithFixedPlatform pkgs pkgname stdenv;
-      extensions = getExtensions pkgs pkgname stdenv;
-      compExtIntersect = intersectLists components extensions;
-      tuples = (getTuples pkgs pkgname pkgTargets) ++ (map (name: getTuples pkgs name compTargets) compExtIntersect);
-    in
-      tuples;
-
-  getFetchUrl = pkgs: pkgname: target: stdenv: fetchurl:
-    let
-      srcInfo = pkgs.${pkgname}.target.${target};
-    in
-      mkComponentSrc {
-        url = srcInfo.xz_url;
-        sha256 = srcInfo.xz_hash;
-        inherit fetchurl;
-      };
-
-  mkComponentSrc = { url, sha256, fetchurl }:
+  mkComponentSrc = { url, sha256 }:
     let
       url' = replaceStrings [" "] ["%20"] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-      fetchurl { inherit name sha256; url = url'; };
-
-  checkMissingExtensions = pkgs: pkgname: stdenv: extensions:
-    let
-      availableExtensions = getExtensions pkgs pkgname stdenv;
-      missingExtensions = subtractLists availableExtensions extensions;
-      extensionsToInstall =
-        if missingExtensions == [] then extensions else throw ''
-          While compiling ${pkgname}: the extension ${head missingExtensions} is not available.
-          Select extensions from the following list:
-          ${concatStringsSep "\n" availableExtensions}'';
-    in
-      extensionsToInstall;
-
-  getComponents = pkgs: pkgname: targets: extensions: targetExtensions: stdenv: fetchurl:
-    let
-      targetExtensionsToInstall = checkMissingExtensions pkgs pkgname stdenv targetExtensions;
-      extensionsToInstall = checkMissingExtensions pkgs pkgname stdenv extensions;
-      hostTargets = [ "*" (toRustTarget stdenv.hostPlatform) (toRustTarget stdenv.targetPlatform) ];
-      pkgTuples = flatten (getTargetPkgTuples pkgs pkgname hostTargets targets stdenv);
-      extensionTuples = flatten (map (name: getTargetPkgTuples pkgs name hostTargets targets stdenv) extensionsToInstall);
-      targetExtensionTuples = flatten (map (name: getTargetPkgTuples pkgs name targets targets stdenv) targetExtensionsToInstall);
-      pkgsTuples = pkgTuples ++ extensionTuples ++ targetExtensionTuples;
-      missingTargets = subtractLists (map (tuple: tuple.target) pkgsTuples) (remove "*" targets);
-      pkgsTuplesToInstall =
-        if missingTargets == [] then pkgsTuples else throw ''
-          While compiling ${pkgname}: the target ${head missingTargets} is not available for any package.'';
-    in
-      map (tuple: { name = tuple.name; src = (getFetchUrl pkgs tuple.name tuple.target stdenv fetchurl); }) pkgsTuplesToInstall;
-
-  mkComponent = { pname, version, src, rustc /* some components depend on rustc */ }:
-    self.stdenv.mkDerivation {
-      inherit pname version src;
-
-      # No point copying src to a build server, then copying back the
-      # entire unpacked contents after just a little twiddling.
-      preferLocalBuild = true;
-
-      nativeBuildInputs = [ self.gnutar ];
-
-      # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
-      # they are offset 0 propagated.
-      propagatedBuildInputs =
-        optional (pname == "rustc") [ self.stdenv.cc self.buildPackages.stdenv.cc ];
-      # This goes downstream packages' buildInputs.
-      depsTargetTargetPropagated =
-        optional (pname == "rustc" && self.stdenv.targetPlatform.isDarwin) self.libiconv;
-
-      installPhase = ''
-        runHook preInstall
-        installerVersion=$(< ./rust-installer-version)
-        if [[ "$installerVersion" != 3 ]]; then
-          echo "Unknown installer version: $installerVersion"
-        fi
-        mkdir -p "$out"
-        while read -r comp; do
-          echo "Installing component $comp"
-          # We don't want to parse the file and invoking cp in bash due to slow forking.
-          cut -d: -f2 <"$comp/manifest.in" | tar -cf - -C "$comp" --files-from - | tar -xC "$out"
-        done <./components
-        runHook postInstall
-      '';
-
-      # This code is inspired by patchelf/setup-hook.sh to iterate over all binaries.
-      preFixup =
-        let
-          inherit (self.stdenv) hostPlatform;
-        in
-        optionalString hostPlatform.isLinux ''
-          setInterpreter() {
-            local dir="$1"
-            [ -e "$dir" ] || return 0
-            header "Patching interpreter of ELF executables and libraries in $dir"
-            local i
-            while IFS= read -r -d ''$'\0' i; do
-              if [[ "$i" =~ .build-id ]]; then continue; fi
-              if ! isELF "$i"; then continue; fi
-              echo "setting interpreter of $i"
-
-              if [[ -x "$i" ]]; then
-                # Handle executables
-                patchelf \
-                  --set-interpreter "$(cat $NIX_CC/nix-support/dynamic-linker)" \
-                  --set-rpath "${makeLibraryPath [ self.zlib ]}:$out/lib" \
-                  "$i" || true
-              else
-                # Handle libraries
-                patchelf \
-                  --set-rpath "${makeLibraryPath [ self.zlib ]}:$out/lib" \
-                  "$i" || true
-              fi
-            done < <(find "$dir" -type f -print0)
-          }
-          setInterpreter $out
-        '' + optionalString (elem pname ["clippy-preview" "rls-preview" "miri-preview"]) ''
-          for f in $out/bin/*; do
-            ${optionalString hostPlatform.isLinux ''
-              patchelf \
-                --set-rpath "${rustc}/lib:${makeLibraryPath [ self.zlib ]}:$out/lib" \
-                "$f" || true
-            ''}
-            ${optionalString hostPlatform.isDarwin ''
-              install_name_tool \
-                -add_rpath "${rustc}/lib" \
-                "$f" || true
-            ''}
-          done
-        '' + optionalString (pname == "llvm-tools-preview" && hostPlatform.isLinux) ''
-          dir="$out/lib/rustlib/${toRustTarget hostPlatform}"
-          for f in "$dir"/bin/*; do
-            patchelf --set-rpath "$dir/lib" "$f" || true
-          done
-        '';
-
-      # rust-docs only contains tons of html files.
-      dontFixup = pname == "rust-docs";
-
-      postFixup = ''
-        # Function moves well-known files from etc/
-        handleEtc() {
-          if [[ -d "$1" ]]; then
-            mkdir -p "$(dirname "$2")"
-            mv -T "$1" "$2"
-          fi
-        }
-        if [[ -e "$out/etc" ]]; then
-          handleEtc "$out/etc/bash_completion.d" "$out/share/bash-completion/completions"
-          rmdir $out/etc || { echo "Installer tries to install to /etc: $(ls $out/etc)"; exit 1; }
-        fi
-      '';
-
-      dontStrip = true;
-    };
+      self.fetchurl { inherit name sha256; url = url'; };
 
   aggregateComponents = { pname, version, components }:
     self.symlinkJoin {
@@ -338,6 +168,8 @@ let
   resolveComponents =
     { name
     , componentSet
+    , allComponentSet
+    , allPlatformSet
     , targetComponentsList
     , profileComponents
     , extensions
@@ -345,77 +177,77 @@ let
     , targetExtensions
     }:
     let
-      rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
-
-      collectComponentTargets = allowMissing: compName: comp:
-        # Fail fast when missing extension.
-        if isString comp then
-          comp
-        # Platform irrelevent components like `rust-src`.
-        else if comp ? "*" then
-          comp."*"
-        # Components for target platform like `rust-std`.
-        else if elem compName targetComponentsList then
-          collectTargetComponentTargets allowMissing compName comp
-        # Components for host platform like `rustc`.
+      # Components for target platform like `rust-std`.
+      collectTargetComponents = allowMissing: name:
+        let
+          targetSelected = flatten (map (tgt: componentSet.${tgt}.${name} or []) targets);
+        in if !allowMissing -> targetSelected != [] then
+          targetSelected
         else
-          comp.${rustHostPlatform} or (
-            if allowMissing then []
-            else "Host component `${compName}` doesn't support target `${rustHostPlatform}`");
-
-      collectTargetComponentTargets = allowMissing: compName: comp:
-        let selected = remove null (map (tgt: comp.${tgt} or null) targets); in
-        if !allowMissing -> selected != [] then
-          selected
-        else
-          "Extension `${compName}` doesn't support any of targets: ${concatStringsSep ", " targets}";
+          "Component `${name}` doesn't support any of targets: ${concatStringsSep ", " targets}";
 
       collectComponents = allowMissing: name:
-        collectComponentTargets allowMissing name (componentSet.${name} or "Missing extension `${name}`");
-      collectTargetComponents = name:
-        collectTargetComponentTargets false name (componentSet.${name} or "Missing target extension `${name}`");
+        if elem name targetComponentsList then
+          collectTargetComponents allowMissing name
+        else
+          # Components for host platform like `rustc`.
+          componentSet.${rustHostPlatform}.${name} or (
+            if allowMissing then []
+            else "Host component `${name}` doesn't support `${rustHostPlatform}`");
 
       # Profile components can be skipped silently when missing.
       # Eg. `rust-mingw` on non-Windows platforms, or `rust-docs` on non-tier1 platforms.
       result =
         flatten (map (collectComponents true) profileComponents) ++
         flatten (map (collectComponents false) extensions) ++
-        flatten (map collectTargetComponents targetExtensions);
+        flatten (map (collectTargetComponents false) targetExtensions);
 
       isTargetUnused = target:
-        !any (name: componentSet ? ${name}.${target})
-          (filter (name: elem name targetComponentsList)
+        !any (name: componentSet ? ${target}.${name})
+          # FIXME: Get rid of the legacy component `rust`.
+          (filter (name: name == "rust" || elem name targetComponentsList)
             (profileComponents ++ extensions)
           ++ targetExtensions);
 
-      errors = filter isString result ++
-        map (tgt: "Target `${tgt}` is not supported by any components or extensions")
-          (filter isTargetUnused targets);
+      # Fail-fast for typo in `targets`, `extensions`, `targetExtensions`.
+      fastErrors =
+        flatten (
+          map (tgt: optional (!(allPlatformSet ? ${tgt}))
+            "Unknown target `${tgt}`, typo or not supported by this version?")
+            targets ++
+          map (name: optional (!(allComponentSet ? ${name}))
+            "Unknown component `${name}`, typo or not support by this version?")
+            (profileComponents ++ extensions ++ targetExtensions));
 
-      allComponents = attrNames componentSet;
-      availableComponentsFor = host:
-        let
-          comps =
-            filter
-              (name: componentSet.${name} ? ${host})
-              allComponents;
-        in
-          if comps == [] then "<empty>" else comps;
+      errors =
+        if fastErrors != [] then
+          fastErrors
+        else
+          filter isString result ++
+          map (tgt: "Target `${tgt}` is not supported by any components or extensions")
+            (filter isTargetUnused targets);
 
       notes = [
-        "note: all extensions are: ${toString allComponents}"
-      ] ++ map (host:
-        "note: extensions available for ${host} are: ${toString (availableComponentsFor host)}"
-      ) targets ++ [
-        "note: Check here to see whether a component is available for rustup:
-          https://rust-lang.github.io/rustup-components-history"
+        "note: profile components: ${toString profileComponents}"
+      ] ++ optional (targets != []) "note: selected targets: ${toString targets}"
+      ++ optional (extensions != []) "note: selected extensions: ${toString extensions}"
+      ++ optional (targetExtensions != []) "note: selected targetExtensions: ${toString targetExtensions}"
+      ++ flatten (map (platform:
+        optional (componentSet ? ${platform})
+          "note: components available for ${platform}: ${toString (attrNames componentSet.${platform})}"
+        ) (unique ([ rustHostPlatform ] ++ targets)))
+      ++ [
+        ''
+          note: check here to see all targets and which components are available on each targets:
+                https://rust-lang.github.io/rustup-components-history
+        ''
       ];
 
     in
       if errors == [] then result
       else throw ''
         Component resolution failed for ${name}
-        ${concatMapStrings (msg: "- ${msg}\n") (errors ++ notes)}
+        ${concatStringsSep "\n" (errors ++ notes)}
       '';
 
   # Genereate the toolchain set from a parsed manifest.
@@ -451,50 +283,41 @@ let
   toolchainFromManifest = manifest: let
     maybeRename = name: manifest.renames.${name}.to or name;
 
-    # For legacy pre-aggregated package `rust`.
-    mkPackage = name: pkg:
-      makeOverridable ({ extensions, targets, targetExtensions, stdenv, fetchurl, patchelf }:
-        let
-          extensions' = map maybeRename extensions;
-          targetExtensions' = map maybeRename targetExtensions;
-          namesAndSrcs = getComponents manifest.pkg name targets extensions' targetExtensions' stdenv fetchurl;
-        in
-          aggregateComponents {
-            pname = name;
-            version = manifest.version;
-            components = map ({ name, src }: (mkComponent {
-              pname = name;
-              inherit (manifest) version;
-              inherit src;
-              # The component name is `rust`.
-              # clippy-driver will be patched to $out/lib without touching this.
-              rustc = null;
-            })) namesAndSrcs;
-          }
-      ) {
-        extensions = [];
-        targets = [];
-        targetExtensions = [];
-        inherit (self) stdenv fetchurl patchelf;
-      };
+    # platform -> true
+    # For fail-fast test.
+    allPlatformSet =
+      listToAttrs (
+        flatten (
+          mapAttrsToList (compName: { target, ... }:
+            map (platform: { name = platform; value = true; })
+              (attrNames target)
+          ) manifest.pkg));
 
-    # componentSet.cargo.x86_64-unknown-linux-gnu = <derivation>;
-    componentSet = mapAttrs (name: pkg:
-      mapAttrs (target: { xz_hash, xz_url }:
-        mkComponent {
-          pname = name;
-          inherit (manifest) version;
-          src = mkComponentSrc {
-            url = xz_url;
-            sha256 = xz_hash;
-            fetchurl = self.fetchurl;
-          };
-          rustc = componentSet.rustc.${target} or
-            (throw "clippy depends on rustc, which is not available");
+    # componentName -> true
+    # May also contains unavailable components. Just for fail-fast test.
+    allComponentSet =
+      mapAttrs (compName: _: true)
+        (manifest.pkg // manifest.renames);
+
+    # componentSet.x86_64-unknown-linux-gnu.cargo = <derivation>;
+    componentSet =
+      mapAttrs (platform: _:
+        mkComponentSet {
+          inherit (manifest) version renames;
+          inherit platform;
+          srcs = removeNulls
+            (mapAttrs (compName: { target, ... }:
+              let content = target.${platform} or target."*" or null; in
+              if content == null then
+                null
+              else
+                mkComponentSrc {
+                  url = content.xz_url;
+                  sha256 = content.xz_hash;
+                }
+            ) manifest.pkg);
         }
-      ) pkg.target
-    ) (removeAttrs manifest.pkg ["rust"]) //
-    mapAttrs (name: { to }: componentSet.${to}) manifest.renames;
+      ) allPlatformSet;
 
     mkProfile = name: profileComponents:
       makeOverridable ({ extensions, targets, targetExtensions }:
@@ -503,14 +326,13 @@ let
           version = manifest.version;
           components = resolveComponents {
             name = "rust-${name}-${manifest.version}";
-            inherit componentSet profileComponents;
+            inherit allPlatformSet allComponentSet componentSet profileComponents targetExtensions;
             inherit (manifest) targetComponentsList;
             extensions = extensions;
             targets = unique ([
-              (toRustTarget self.stdenv.hostPlatform) # Build script requires host std.
-              (toRustTarget self.stdenv.targetPlatform)
+              rustHostPlatform # Build script requires host std.
+              rustTargetPlatform
             ] ++ targets);
-            inherit targetExtensions;
           };
         }
       ) {
@@ -521,29 +343,37 @@ let
 
     profiles = mapAttrs mkProfile manifest.profiles;
 
-  in
-    # Components.
-    mapAttrs (name: targets: targets."*" or targets.${toRustTarget self.stdenv.hostPlatform} or null) componentSet //
-    # Profiles.
-    profiles //
-    {
-      # Legacy support for special pre-aggregated package.
-      # It has more components than `default` profile but less than `complete` profile.
-      rust =
-        let pkg = mkPackage "rust" manifest.pkg.rust; in
-        if match ".*[.].*[.].*" != null && profiles != {}
-          then trace ''
-            Rust ${manifest.version}:
-            Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
-            Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
-            See README for more information.
-          '' pkg
-          else pkg;
+    result =
+      # Individual components.
+      componentSet.${rustHostPlatform} //
+      # Profiles.
+      profiles // {
+        # Legacy support for special pre-aggregated package.
+        # It has more components than `default` profile but less than `complete` profile.
+        rust =
+          let
+            pkg = mkProfile "legacy" [ "rust" ];
+          in if profiles != {} then
+            trace ''
+              Rust ${manifest.version}:
+              Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
+              Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
+              See README for more information.
+            '' pkg
+          else
+            pkg;
+      };
 
+  in
+    # If the platform is not supported for the current version, return nothing here,
+    # so others can easily check it by `toolchain ? default`.
+    optionalAttrs (componentSet ? ${rustHostPlatform}) result //
+    {
       # Internal use.
       _components = componentSet;
       _profiles = profiles;
       _version = manifest.version;
+      _manifest = manifest;
     };
 
   # Same as `toolchainFromManifest` but read from a manifest file.
@@ -560,27 +390,28 @@ let
     pname ? "rust-custom",
     # Git revision of rustc.
     rev,
+    # Version of the built package.
+    version ? substring 0 7 rev,
     # Attrset with component name as key and its SRI hash as value.
     components,
     # Rust target to download.
-    target ? toRustTarget self.stdenv.targetPlatform
+    target ? rustTargetPlatform
   }: let
-    shortRev = substring 0 7 rev;
-    components' = mapAttrs (compName: hash: mkComponent {
-      pname = compName;
-      version = shortRev;
-      src = self.fetchurl {
+    hashToSrc = compName: hash:
+      self.fetchurl {
         url = if compName == "rust-src"
           then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly.tar.xz"
           else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
         inherit hash;
       };
-      rustc = components'.rustc or (throw "rustc is required for clippy");
-    }) components;
+    components' = mkComponentSet {
+      inherit version;
+      platform = target;
+      srcs = mapAttrs hashToSrc components;
+    };
   in
     aggregateComponents {
-      inherit pname;
-      version = shortRev;
+      inherit pname version;
       components = attrValues components';
     };
 
