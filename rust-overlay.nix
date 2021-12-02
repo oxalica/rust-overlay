@@ -1,4 +1,4 @@
-# Define component resolution, component aggregation and utility functions.
+# Define component resolution and utility functions.
 self: super:
 
 let
@@ -30,6 +30,8 @@ let
   mkComponentSet = self.callPackage ./mk-component-set.nix {
     inherit toRustTarget removeNulls;
   };
+
+  mkAggregated = self.callPackage ./mk-aggregated.nix {};
 
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
@@ -126,37 +128,6 @@ let
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
       self.fetchurl { inherit name sha256; url = url'; };
-
-  aggregateComponents = { pname, version, components }:
-    self.symlinkJoin {
-      name = pname + "-" + version;
-      inherit pname version;
-
-      paths = components;
-
-      postBuild = ''
-        # If rustc or rustdoc is in the derivation, we need to copy their
-        # executable into the final derivation. This is required
-        # for making them find the correct SYSROOT.
-        for target in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
-          if [ -e $target ]; then
-            cp --remove-destination "$(realpath -e $target)" $target
-          fi
-        done
-
-        if [ -e $out/bin/cargo-miri ]; then
-          mv $out/bin/{cargo-miri,.cargo-miri-wrapped}
-          cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri
-          chmod +w $out/bin/cargo-miri
-          substituteInPlace $out/bin/cargo-miri \
-            --replace "@bash@" "${self.bash}/bin/bash" \
-            --replace "@cargo_miri@" "$out/bin/.cargo-miri-wrapped" \
-            --replace "@out@" "$out"
-        fi
-      '';
-
-      meta.platforms = self.lib.platforms.all;
-    };
 
   # Resolve final components to install from mozilla-overlay style `extensions`, `targets` and `targetExtensions`.
   #
@@ -321,7 +292,7 @@ let
 
     mkProfile = name: profileComponents:
       makeOverridable ({ extensions, targets, targetExtensions }:
-        aggregateComponents {
+        mkAggregated {
           pname = "rust-${name}";
           version = manifest.version;
           components = resolveComponents {
@@ -410,7 +381,7 @@ let
       srcs = mapAttrs hashToSrc components;
     };
   in
-    aggregateComponents {
+    mkAggregated {
       inherit pname version;
       components = attrValues components';
     };

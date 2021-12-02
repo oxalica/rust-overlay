@@ -1,5 +1,5 @@
 # Define component derivations and special treatments.
-{ lib, stdenv, buildPackages, gnutar, gcc, zlib, libiconv, autoPatchelfHook
+{ lib, stdenv, gnutar, autoPatchelfHook, zlib
 , toRustTarget, removeNulls
 }:
 # Release version of the whole set.
@@ -16,7 +16,7 @@ let
   inherit (stdenv) hostPlatform targetPlatform;
 
   mkComponent = pname: src:
-    stdenv.mkDerivation {
+    stdenv.mkDerivation rec {
       inherit pname version src;
       name = "${pname}-${version}-${platform}";
 
@@ -26,18 +26,11 @@ let
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ gnutar autoPatchelfHook ];
-      buildInputs = [ zlib ] ++
-        # These components link to `librustc_driver-*.so`.
-        optional (elem pname [ "clippy-preview" "rls-preview" "miri-preview" ]) [ self.rustc ];
-
-      # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
-      # they are offset 0 propagated.
-      propagatedBuildInputs =
-        optional (pname == "rustc") [ stdenv.cc buildPackages.stdenv.cc ];
-      # This goes downstream packages' buildInputs.
-      depsTargetTargetPropagated =
-        optional (pname == "rustc" && targetPlatform.isDarwin) libiconv;
+      nativeBuildInputs = [ gnutar ] ++ optional (!dontFixup) autoPatchelfHook;
+      buildInputs =
+        optional (elem pname [ "rustc" "cargo" ]) zlib ++
+        # These components link to `librustc_driver*.so` or `libLLVM*.so`.
+        optional (elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" ]) self.rustc;
 
       dontConfigure = true;
       dontBuild = true;
@@ -71,8 +64,8 @@ let
         fi
       '';
 
-      # `rust-docs` only contains tons of html files. Don't waste time scanning files.
-      dontFixup = pname == "rust-docs";
+      # Only contain tons of html files. Don't waste time scanning files.
+      dontFixup = elem pname [ "rust-docs" "rustc-docs" ];
 
       dontStrip = true;
     };
