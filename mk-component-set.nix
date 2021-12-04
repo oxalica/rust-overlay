@@ -28,7 +28,7 @@ let
 
       nativeBuildInputs = [ gnutar ] ++ optional (!dontFixup) autoPatchelfHook;
       buildInputs =
-        optional (elem pname [ "rustc" "cargo" ]) zlib ++
+        optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" ]) zlib ++
         # These components link to `librustc_driver*.so` or `libLLVM*.so`.
         optional (elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" ]) self.rustc;
 
