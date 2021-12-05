@@ -33,6 +33,10 @@ jobs:
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
+    # Workaround for https://github.com/oxalica/rust-overlay/issues/54
+    - name: Don't let ~/.cargo/bin mess things up
+      run: rm -rf ~/.cargo/bin
+
     - name: Sync stable channel
       timeout-minutes: 5
       run: python3 ./scripts/fetch.py stable
