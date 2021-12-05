@@ -12,10 +12,13 @@
 , renames
 }:
 let
-  inherit (lib) elem mapAttrs optional optionalString makeLibraryPath;
-  inherit (stdenv) hostPlatform targetPlatform;
+  inherit (lib) elem mapAttrs optional optionalString;
+  inherit (stdenv) hostPlatform;
 
-  mkComponent = pname: src:
+  mkComponent = pname: src: let
+    # These components link to `librustc_driver*.so` or `libLLVM*.so`.
+    linksToRustc = elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" ];
+  in
     stdenv.mkDerivation rec {
       inherit pname version src;
       name = "${pname}-${version}-${platform}";
@@ -26,11 +29,13 @@ let
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ gnutar ] ++ optional (!dontFixup) autoPatchelfHook;
+      nativeBuildInputs = [ gnutar ] ++
+        # Darwin doesn't use ELF, and they usually just work due to relative RPATH.
+        optional (!dontFixup && !hostPlatform.isDarwin) autoPatchelfHook;
+
       buildInputs =
         optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" ]) zlib ++
-        # These components link to `librustc_driver*.so` or `libLLVM*.so`.
-        optional (elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" ]) self.rustc;
+        optional linksToRustc self.rustc;
 
       dontConfigure = true;
       dontBuild = true;
@@ -66,6 +71,13 @@ let
 
       # Only contain tons of html files. Don't waste time scanning files.
       dontFixup = elem pname [ "rust-docs" "rustc-docs" ];
+
+      # Darwin binaries usually just work... except for these linking to rustc from another drv.
+      postFixup = optionalString (hostPlatform.isDarwin && linksToRustc) ''
+        for f in $out/bin/*; do
+          install_name_tool -add_rpath "${self.rustc}/lib" "$f" || true
+        done
+      '';
 
       dontStrip = true;
     };
