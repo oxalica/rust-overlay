@@ -149,7 +149,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [cross-aarch64, cross-wasi]
+        example: [cross-aarch64, cross-wasi, cross-mingw]
 
     steps:
     - name: Checkout
