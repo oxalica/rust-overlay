@@ -210,7 +210,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
   }
   ```
 
-  *Warning: This may not always work (including the example below) since upstream CI periodly purges old artifacts.*
+  *Warning: This may not always work (including the example below) since upstream CI periodically purges old artifacts.*
 
 - There also an cross-compilation example in [`examples/cross-aarch64`].
 
