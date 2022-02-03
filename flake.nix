@@ -147,6 +147,10 @@
             extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "aarch64-unknown-linux-gnu" ];
           });
+      } // optionalAttrs (system == "aarch64-darwin") {
+        url-forward = assertUrl
+          nightly."2022-02-02".rust-docs
+          "https://static.rust-lang.org/dist/2022-02-02/rust-docs-nightly-x86_64-apple-darwin.tar.xz";
       };
 
       checkDrvs = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {

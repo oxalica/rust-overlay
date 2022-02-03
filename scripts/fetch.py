@@ -14,7 +14,7 @@ import requests
 
 MAX_TRIES = 3
 RETRY_DELAY = 3.0
-SYNC_MAX_UPDATE = 8
+SYNC_MAX_UPDATE = 32
 
 MIN_STABLE_VERSION = '1.29.0'
 MIN_BETA_DATE = MIN_NIGHTLY_DATE = datetime.date.fromisoformat('2018-09-13')
@@ -145,6 +145,7 @@ def translate_dump_manifest(channel: str, manifest: str, f):
         pkg_targets = sorted(pkg['target'].keys())
 
         url_version = rustc_version
+        url_target_map = {}
         for target_name in pkg_targets:
             target = pkg['target'][target_name]
             if not target['available']:
@@ -153,9 +154,21 @@ def translate_dump_manifest(channel: str, manifest: str, f):
             target_tail = '' if target_name == '*' else '-' + target_name
             start = f'{DIST_ROOT}/{date}/{pkg_name_stripped}-'
             end = f'{target_tail}.tar.xz'
+
             # Occurs in nightly-2019-01-10. Maybe broken or hirarerchy change?
             if url.startswith('nightly/'):
                 url = DIST_ROOT + url[7:]
+
+            # The target part may not be the same as current one.
+            # This occurs in `pkg.rust-std.target.aarch64-apple-darwin` of nightly-2022-02-02,
+            # which points to the URL of x86_64-apple-darwin rust-docs.
+            if not url.endswith(end):
+                assert url.startswith(start + default_url_version + '-') and url.endswith('.tar.xz')
+                url_target = url[len(start + default_url_version + '-'):-len('.tar.xz')]
+                assert url_target in pkg_targets
+                url_target_map[target_name] = url_target
+                continue
+
             assert url.startswith(start) and url.endswith(end), f'Unexpected url: {url}'
             url_version = url[len(start):-len(end)]
 
@@ -163,6 +176,15 @@ def translate_dump_manifest(channel: str, manifest: str, f):
         if url_version != default_url_version:
             f.write(f'u={escape_nix_string(url_version)};')
         for target_name in pkg_targets:
+            # Forward to another URL.
+            if target_name in url_target_map:
+                url_target = url_target_map[target_name]
+                assert pkg['target'][url_target] == pkg['target'][target_name]
+                url_target_id = compress_target(url_target)[1:]
+                assert url_target_id
+                f.write(f'{compress_target(target_name)}={url_target_id};')
+                continue
+
             target = pkg['target'][target_name]
             if not target['available']:
                 continue
@@ -175,6 +197,7 @@ def translate_dump_manifest(channel: str, manifest: str, f):
             expect_url = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-{url_version}{target_tail}.tar.xz'
             assert url == expect_url, f'Unexpected url: {url}, expecting: {expect_url}'
             f.write(f'{compress_target(target_name)}="{hash}";')
+
         f.write('};')
     f.write('}\n')
 

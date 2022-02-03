@@ -1,6 +1,6 @@
 final: prev:
 let
-  inherit (builtins) match;
+  inherit (builtins) match isString toString;
 
   inherit (final.lib)
     attrNames concatMap elemAt filter hasAttr mapAttrs mapAttrs' removeSuffix;
@@ -67,8 +67,8 @@ let
         # We use rustc version for all components to reduce manifest size.
         # This version is just used for component derivation name.
         version = "${v} (000000000 ${d})"; # "<version> (<commit-hash> yyyy-mm-dd)"
-        target =
-          mapAttrs' (targetIdx: hash: let
+        target = let
+          results = mapAttrs' (targetIdx: hash: let
             target = targets.${targetIdx};
             pkgNameStripped = removeSuffix "-preview" pkgName;
             targetTail = if targetIdx == "_" then "" else "-" + target;
@@ -78,11 +78,20 @@ let
               else channel;                           # Otherwise, for beta/nightly channel, default to be "beta"/"nightly".
           in {
             name = target;
-            value = {
-              xz_url = "${distRoot}/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
-              xz_hash = hash;
-            } // (if pkgName == "rust" then rustPkgExtra pkg target else {});
+            value =
+              # Normally, hash is just the hash.
+              if isString hash then
+                {
+                  xz_url = "${distRoot}/${date}/${pkgNameStripped}-${urlVersion}${targetTail}.tar.xz";
+                  xz_hash = hash;
+                } // (if pkgName == "rust" then rustPkgExtra pkg target else {})
+              # But hash can be an integer to forward to another URL.
+              # This occurs in aarch64-apple-darwin rust-docs on 2022-02-02.
+              else
+                results.${targets."_${toString hash}"};
           }) (removeAttrs hashes ["u"]);
+        in
+          results;
       }) (removeAttrs manifest ["v" "d" "r" "p"]);
 
     profiles = if p == null
