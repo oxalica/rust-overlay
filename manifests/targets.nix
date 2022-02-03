@@ -92,4 +92,8 @@
   _90 = "wasm32-unknown-wasi";
   _91 = "x86_64-pc-solaris";
   _92 = "aarch64-apple-ios-sim";
+  _93 = "mipsisa32r6-unknown-linux-gnu";
+  _94 = "mipsisa32r6el-unknown-linux-gnu";
+  _95 = "mipsisa64r6-unknown-linux-gnuabi64";
+  _96 = "mipsisa64r6el-unknown-linux-gnuabi64";
 }
