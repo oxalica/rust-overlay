@@ -149,7 +149,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [cross-aarch64, cross-wasi, cross-mingw]
+        # `wasm32-wasi-stage-final-gcc` is currently broken.
+        # https://github.com/oxalica/rust-overlay/runs/5247844387
+        # example: [cross-aarch64, cross-wasi, cross-mingw]
+        example: [cross-aarch64, cross-mingw]
 
     steps:
     - name: Checkout
