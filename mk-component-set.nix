@@ -1,5 +1,5 @@
 # Define component derivations and special treatments.
-{ lib, stdenv, gnutar, autoPatchelfHook, zlib
+{ lib, stdenv, gnutar, autoPatchelfHook, zlib, gccForLibs
 , toRustTarget, removeNulls
 }:
 # Release version of the whole set.
@@ -35,6 +35,9 @@ let
 
       buildInputs =
         optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" ]) zlib ++
+        # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux.
+        # https://github.com/oxalica/rust-overlay/issues/73
+        optional (!dontFixup && !hostPlatform.isDarwin && pname == "rustc") gccForLibs.lib ++
         optional linksToRustc self.rustc;
 
       dontConfigure = true;
