@@ -99,9 +99,11 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
-        channel: [stable, beta]
+        channel: [stable, beta, nightly]
         profile: [minimal, default]
     runs-on: ${{ matrix.os }}
+    env:
+      NIX_SHELL_CMD: nix-shell --pure --argstr channel ${{ matrix.channel }} --argstr profile ${{ matrix.profile }}
 
     steps:
     - name: Checkout
@@ -119,27 +121,27 @@ jobs:
     - name: Prepare nix-shell
       run: |
         cd examples/hello-world
-        nix-shell --pure --argstr profile ${{ matrix.profile }} --command true
+        $NIX_SHELL_CMD --command true
 
     - name: Test cargo build
       run: |
         cd examples/hello-world
         set -o pipefail
-        nix-shell --pure --argstr profile ${{ matrix.profile }} --command "make run" | tee out
+        $NIX_SHELL_CMD --command "make run" | tee out
         [[ "$(< out)" == *"Hello, world!"* ]]
 
     - name: Test cargo fmt
       if: matrix.profile == 'default'
       run: |
         cd examples/hello-world
-        nix-shell --pure --argstr profile ${{ matrix.profile }} --command "cargo fmt -- --check"
+        $NIX_SHELL_CMD --command "cargo fmt -- --check"
 
     - name: Test cargo clippy
       if: matrix.profile == 'default'
       run: |
         cd examples/hello-world
         set -o pipefail
-        nix-shell --pure --argstr profile ${{ matrix.profile }} --command "cargo clippy -- --cap-lints=warn" 2>&1 | tee out
+        $NIX_SHELL_CMD --command "cargo clippy -- --cap-lints=warn" 2>&1 | tee out
         [[ "$(< out)" == *"warning: this loop never actually loops"* ]]
 
   test-cross-examples:
