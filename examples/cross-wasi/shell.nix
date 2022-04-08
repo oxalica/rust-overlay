@@ -7,8 +7,9 @@
   };
   overlays = [ (import ../..) ];
 }).callPackage (
-{ mkShell, stdenv, rust-bin, wasmtime }:
-mkShell {
+# We don't need WASI C compiler from nixpkgs, so use `mkShellNoCC`.
+{ mkShellNoCC, stdenv, rust-bin, wasmtime }:
+mkShellNoCC {
   nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
 
   depsBuildBuild = [ wasmtime ];

@@ -1,5 +1,5 @@
 # Define component derivations and special treatments.
-{ lib, stdenv, gnutar, autoPatchelfHook, zlib, gccForLibs
+{ lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs
 , toRustTarget, removeNulls
 }:
 # Release version of the whole set.
@@ -19,7 +19,7 @@ let
     # These components link to `librustc_driver*.so` or `libLLVM*.so`.
     linksToRustc = elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" ];
   in
-    stdenv.mkDerivation rec {
+    stdenvNoCC.mkDerivation rec {
       inherit pname version src;
       name = "${pname}-${version}-${platform}";
 
@@ -31,14 +31,22 @@ let
 
       nativeBuildInputs = [ gnutar ] ++
         # Darwin doesn't use ELF, and they usually just work due to relative RPATH.
-        optional (!dontFixup && !hostPlatform.isDarwin) autoPatchelfHook;
+        optional (!dontFixup && !hostPlatform.isDarwin) autoPatchelfHook ++
+        # For `install_name_tool`.
+        optional (hostPlatform.isDarwin && linksToRustc) bintools;
 
       buildInputs =
         optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" ]) zlib ++
-        # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux.
-        # https://github.com/oxalica/rust-overlay/issues/73
-        optional (!dontFixup && !hostPlatform.isDarwin && pname == "rustc") gccForLibs.lib ++
         optional linksToRustc self.rustc;
+
+      # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux.
+      # https://github.com/oxalica/rust-overlay/issues/73
+      #
+      # N.B. `gcc` is a compiler which is sensitive to `targetPlatform`.
+      # We use `depsHostHost` instead of `buildInputs` to force it ignore the target,
+      # since binaries produced by `rustc` don't actually relies on this gccForLibs.
+      depsHostHost =
+        optional (!dontFixup && !hostPlatform.isDarwin && pname == "rustc") gccForLibs.lib;
 
       dontConfigure = true;
       dontBuild = true;
