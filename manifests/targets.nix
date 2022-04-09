@@ -96,4 +96,5 @@
   _94 = "mipsisa32r6el-unknown-linux-gnu";
   _95 = "mipsisa64r6-unknown-linux-gnuabi64";
   _96 = "mipsisa64r6el-unknown-linux-gnuabi64";
+  _97 = "x86_64-unknown-none";
 }
