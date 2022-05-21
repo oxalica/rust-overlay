@@ -61,7 +61,7 @@ Here's an example of using it in nixos configuration.
   description = "My configuration";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
@@ -91,7 +91,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
   description = "A devShell example";
 
   inputs = {
-    nixpkgs.url      = "github:nixos/nixpkgs/nixos-unstable";
+    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url  = "github:numtide/flake-utils";
   };
@@ -106,7 +106,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
       in
       with pkgs;
       {
-        devShell = mkShell {
+        devShells.default = mkShell {
           buildInputs = [
             openssl
             pkgconfig
