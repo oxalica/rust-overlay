@@ -13,6 +13,11 @@ no need to have network access. It also works well with [Nix Flakes](https://nix
 - Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
   (which are randomly picked and may change over time).
 
+rust-overlay is targeting these channels and they are tested on CI.
+Other channels may be supported but are not guarenteed.
+- nixpkgs-unstable
+- nixos-21.11 (for Linux)
+
 For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
 
 ## Installation
