@@ -105,6 +105,12 @@ jobs:
         exclude:
           - os: macos-latest
             nixpkgs-channel: nixos-21.11
+        include:
+          # The legacy package, used by compatible functions.
+          - os: ubuntu-latest
+            rust-channel: stable
+            profile: rust
+            nixpkgs-channel: nixpkgs-unstable
     runs-on: ${{ matrix.os }}
     env:
       NIX_SHELL_CMD: nix-shell --pure --argstr channel ${{ matrix.rust-channel }} --argstr profile ${{ matrix.profile }}
@@ -135,13 +141,13 @@ jobs:
         [[ "$(< out)" == *"Hello, world!"* ]]
 
     - name: Test cargo fmt
-      if: matrix.profile == 'default'
+      if: matrix.profile == 'default' || matrix.profile == 'rust'
       run: |
         cd examples/hello-world
         $NIX_SHELL_CMD --command "cargo fmt -- --check"
 
     - name: Test cargo clippy
-      if: matrix.profile == 'default'
+      if: matrix.profile == 'default' || matrix.profile == 'rust'
       run: |
         cd examples/hello-world
         set -o pipefail

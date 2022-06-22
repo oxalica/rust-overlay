@@ -36,7 +36,7 @@ let
         optional (hostPlatform.isDarwin && linksToRustc) bintools;
 
       buildInputs =
-        optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" ]) zlib ++
+        optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" "rust" ]) zlib ++
         optional linksToRustc self.rustc;
 
       # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux.
