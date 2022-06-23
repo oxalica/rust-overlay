@@ -89,7 +89,7 @@ Here's an example of using it in nixos configuration.
 
 #### Use in `devShell` for `nix develop`
 
-Running `nix develop` will create a shell with the default nightly Rust toolchain installed:
+Running `nix develop` will create a shell with the default beta Rust toolchain installed:
 
 ```nix
 {
@@ -117,7 +117,7 @@ Running `nix develop` will create a shell with the default nightly Rust toolchai
             pkgconfig
             exa
             fd
-            rust-bin.nightly.latest.default
+            rust-bin.beta.latest.default
           ];
 
           shellHook = ''
