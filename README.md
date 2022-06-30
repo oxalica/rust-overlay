@@ -45,14 +45,13 @@ And then feel free to use it anywhere like
 
 This repository already has flake support.
 
-NOTE: **Only the output `overlay` is stable and preferred to be used in your flake.**
-Other outputs like `packages` and `defaultPackage` are for human try and are subject to change.
+**Warning: Only the output `overlay`/`overlays` are currently stable. Use other outputs at your own risk!**
 
 For a quick play, just use `nix shell` to bring the latest stable rust toolchain into scope.
 (All commands below requires preview version of Nix with flake support.)
 ```shell
 $ nix shell github:oxalica/rust-overlay
-$ rustc --version
+$ rustc --version # This is only an example. You may get a newer version here.
 rustc 1.49.0 (e1884a8e3 2020-12-29)
 $ cargo --version
 cargo 1.49.0 (d00d64df9 2020-12-05)

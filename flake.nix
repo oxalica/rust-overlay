@@ -27,39 +27,42 @@
 
   in {
 
-    overlay = final: prev: overlay final prev;
+    # Compat.
+    overlay =
+      builtins.trace
+        "[1;31mwarning: rust-overlay's flake output `overlay` is deprecated in favor of `overlays.default`[0m"
+        overlay;
+
+    overlays = {
+      default = overlay;
+      rust-overlay = overlay;
+    };
 
   } // flake-utils.lib.eachSystem allSystems (system: let
     pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
   in rec {
-    # `defaultApp`, `defaultPackage` and `packages` are for human only.
-    # They are subject to change and **DO NOT** depend on them in your flake.
-    # Please use `overlay` instead.
-
-    defaultApp = {
-      type = "app";
-      program = "${defaultPackage}/bin/rustc";
-    };
-    defaultPackage = packages.rust;
+    # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
 
     packages = let
+      select = version: comps: if version == "latest" then null else comps.default or null;
       result =
         mapAttrs' (version: comps: {
-          name = "rust-${replaceStrings ["."] ["-"] version}";
-          value = comps.default or null;
+          name = "rust_${replaceStrings ["."] ["_"] version}";
+          value = select version comps;
         }) pkgs.rust-bin.stable //
         mapAttrs' (version: comps: {
-          name = "rust-nightly-${version}";
-          value = comps.default or null;
+          name = "rust-nightly_${version}";
+          value = select version comps;
         }) pkgs.rust-bin.nightly //
         mapAttrs' (version: comps: {
-          name = "rust-beta-${version}";
-          value = comps.default or null;
+          name = "rust-beta_${version}";
+          value = select version comps;
         }) pkgs.rust-bin.beta //
-        {
-          rust = result.rust-latest;
-          rust-nightly = result.rust-nightly-latest;
-          rust-beta = result.rust-beta-latest;
+        rec {
+          rust = pkgs.rust-bin.stable.latest.default;
+          rust-beta = pkgs.rust-bin.beta.latest.default;
+          rust-nightly = pkgs.rust-bin.nightly.latest.default;
+          default = rust;
         };
     in filterAttrs (name: drv: drv != null) result;
 
@@ -69,16 +72,11 @@
 
       rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
-      assertEq = lhs: rhs: {
-        assertion = lhs == rhs;
-        message = "`${lhs}` != `${rhs}`";
-      };
-      assertUrl = drv: url: let
-        srcUrl = head drv.src.urls;
-      in assertEq srcUrl url;
-
+      assertEq = (flake-utils.lib.check-utils system).isEqual;
+      assertUrl = drv: url: assertEq (head drv.src.urls) url;
+    in
       # Check only tier 1 targets.
-      assertions = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
+      optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
         url-no-arch = assertUrl stable."1.48.0".rust-src "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
         url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustHostPlatform}.tar.xz";
         url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustHostPlatform}.tar.xz";
@@ -94,11 +92,9 @@
         url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustHostPlatform}.tar.xz";
         url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustHostPlatform}.tar.xz";
 
+        # 1.30.0 has `rustfmt` still in preview state.
+        rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
-        rename-unavailable = {
-          assertion = !(stable."1.30.0" ? rustfmt);
-          message = "1.30.0 has rustfmt still in preview state";
-        };
 
         latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rustc stable.latest.rustc;
         latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rustc beta.latest.rustc;
@@ -147,32 +143,18 @@
             extensions = [ "rustfmt" "rustc-dev" ];
             targets = [ "aarch64-unknown-linux-gnu" ];
           });
+
+        latest-nightly-default = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
+
+      # Darwin specific tests.
       } // optionalAttrs (system == "aarch64-darwin") {
         url-forward = assertUrl
           nightly."2022-02-02".rust-docs
           "https://static.rust-lang.org/dist/2022-02-02/rust-docs-nightly-x86_64-apple-darwin.tar.xz";
-      };
-
-      checkDrvs = optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
-        latest-nightly-default = rust-bin.selectLatestNightlyWith (toolchain: toolchain.default);
-      } // optionalAttrs (system == "aarch64-darwin") {
         aarch64-darwin-use-x86-docs = rust-bin.stable."1.51.0".default.override {
           targets = [ "x86_64-apple-darwin" ];
           targetExtensions = [ "rust-docs" ];
         };
       };
-
-      failedAssertions =
-        filter (msg: msg != null) (
-          mapAttrsToList
-          (name: { assertion, message }: if assertion
-            then null
-            else "Assertion `${name}` failed: ${message}\n")
-          assertions);
-
-    in if failedAssertions == []
-      then checkDrvs
-      else throw (builtins.toString failedAssertions);
-
   });
 }
