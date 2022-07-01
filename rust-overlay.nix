@@ -389,7 +389,7 @@ let
   # Select latest nightly toolchain which makes selected profile builds.
   # Some components are missing in some nightly releases.
   # Usage:
-  # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = "llvm-tools-preview"; })`
+  # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = ["llvm-tools-preview"]; })`
   selectLatestNightlyWith = selector:
     let
       nightlyDates = attrNames (removeAttrs self.rust-bin.nightly [ "latest" ]);
