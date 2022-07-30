@@ -1,0 +1,31 @@
+name: update-stable
+on:
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - manifests/beta/*.nix
+      - manifests/nightly/*.nix
+
+jobs:
+  update-stable:
+    name: Update "stable" branch
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Do we have updates other than nightly or beta?
+        id: check-non-nightly-update
+        continue-on-error: true
+        run: |
+          git diff --name-only stable master | grep -v -E 'manifests/(nightly|beta)'
+
+      - name: Update stable -> master
+        if: steps.check-non-nightly-update.outcome == 'success'
+        run: |
+          git checkout stable
+          git merge --ff-only master
+          git push stable:stable
