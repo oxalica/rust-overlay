@@ -7,6 +7,8 @@ on:
       - manifests/beta/*.nix
       - manifests/nightly/*.nix
 
+  workflow_dispatch:
+
 jobs:
   update-stable:
     name: Update "stable" branch
