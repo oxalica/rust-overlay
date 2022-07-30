@@ -1,16 +1,14 @@
 #!/usr/bin/env nix-shell
 #!nix-shell -i python3 -p "python3.withPackages (ps: with ps; [ toml requests ])"
+from pathlib import Path
 import base64
-import json
+import datetime
 import re
-import string
 import sys
 import time
-import datetime
-from pathlib import Path
 
-import toml
 import requests
+import toml
 
 MAX_TRIES = 3
 RETRY_DELAY = 3.0
