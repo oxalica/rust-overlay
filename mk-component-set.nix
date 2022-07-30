@@ -1,5 +1,5 @@
 # Define component derivations and special treatments.
-{ lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs
+{ lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs, callPackage
 , toRustTarget, removeNulls
 }:
 # Release version of the whole set.
@@ -14,6 +14,11 @@
 let
   inherit (lib) elem mapAttrs optional optionalString;
   inherit (stdenv) hostPlatform;
+
+  miri-wrapped = callPackage ./miri-wrapped.nix {
+    inherit toRustTarget;
+    inherit (self) rustc cargo rust-std rust-src miri-preview;
+  };
 
   mkComponent = pname: src: let
     # These components link to `librustc_driver*.so` or `libLLVM*.so`.
@@ -98,4 +103,6 @@ let
 in
   removeNulls (
     self //
-    mapAttrs (alias: { to }: self.${to} or null) renames)
+    mapAttrs (alias: { to }: self.${to} or null) renames // {
+      inherit miri-wrapped;
+    })
