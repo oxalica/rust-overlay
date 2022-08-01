@@ -1,5 +1,5 @@
 { lib, stdenv, symlinkJoin, pkgsTargetTarget, bash }:
-{ pname, version, components }:
+{ pname, version, selectedComponents, availableComponents ? selectedComponents }:
 let
   inherit (lib) optional optionalString;
   inherit (stdenv) targetPlatform;
@@ -8,7 +8,9 @@ symlinkJoin {
   name = pname + "-" + version;
   inherit pname version;
 
-  paths = components;
+  paths = selectedComponents;
+
+  passthru = { inherit availableComponents; };
 
   # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
   # they are offset 0 propagated.

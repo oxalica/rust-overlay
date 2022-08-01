@@ -295,7 +295,8 @@ let
         mkAggregated {
           pname = "rust-${name}";
           version = manifest.version;
-          components = resolveComponents {
+          availableComponents = componentSet.${rustHostPlatform};
+          selectedComponents = resolveComponents {
             name = "rust-${name}-${manifest.version}";
             inherit allPlatformSet allComponentSet componentSet profileComponents targetExtensions;
             inherit (manifest) targetComponentsList;
@@ -383,7 +384,7 @@ let
   in
     mkAggregated {
       inherit pname version;
-      components = attrValues components';
+      selectedComponents = attrValues components';
     };
 
   # Select latest nightly toolchain which makes selected profile builds.
