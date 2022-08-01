@@ -15,6 +15,7 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3.0.2
       with:
+        persist-credentials: false
         ref: master
 
     - name: Install Nix
@@ -66,5 +67,7 @@ jobs:
 
     - name: Push changes
       if: steps.commit.outcome == 'success'
-      run: |
-        git push master:master
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: master

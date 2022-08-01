@@ -19,10 +19,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3.0.2
         with:
+          persist-credentials: false
           fetch-depth: 0
 
-      - name: Update stable -> master
+      - name: Forward stable -> master
         run: |
           git checkout stable
           git merge --ff-only master
-          git push stable:stable
+
+      - name: Push changes
+        uses: ad-m/github-push-action@master
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          branch: stable
