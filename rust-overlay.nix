@@ -5,9 +5,9 @@ let
   inherit (builtins) compareVersions fromTOML match readFile tryEval;
 
   inherit (self.lib)
-    any attrNames attrValues concatMapStrings concatStringsSep elem elemAt filter flatten foldl'
-    hasPrefix head intersectLists isString length listToAttrs makeLibraryPath makeOverridable mapAttrs
-    mapAttrsToList optional optionalAttrs optionalString remove replaceStrings substring subtractLists trace unique;
+    any attrNames attrValues concatStringsSep elem elemAt filter flatten foldl'
+    hasPrefix head isString length listToAttrs makeOverridable mapAttrs
+    mapAttrsToList optional optionalAttrs replaceStrings substring trace unique;
 
   # Remove keys from attrsets whose value is null.
   removeNulls = set:

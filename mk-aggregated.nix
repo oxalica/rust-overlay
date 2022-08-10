@@ -1,7 +1,7 @@
 { lib, stdenv, symlinkJoin, pkgsTargetTarget, bash }:
 { pname, version, selectedComponents, availableComponents ? selectedComponents }:
 let
-  inherit (lib) optional optionalString;
+  inherit (lib) optional;
   inherit (stdenv) targetPlatform;
 in
 symlinkJoin {
