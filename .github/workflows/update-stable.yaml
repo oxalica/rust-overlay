@@ -30,18 +30,16 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+          ref: stable
 
       - name: Do we have updates other than nightly or beta?
         id: check-non-nightly-update
         continue-on-error: true
-        run: |
-          git diff --name-only stable master | grep -v -E 'manifests/(nightly|beta)|docs|README'
+        run: git diff --name-only stable origin/master -- | grep -v -E 'manifests/(nightly|beta)|docs|README'
 
       - name: Forward stable -> master
         if: steps.check-non-nightly-update.outcome == 'success'
-        run: |
-          git checkout stable
-          git merge --ff-only master
+        run: git merge --ff-only origin/master
 
       - name: Push changes
         if: steps.check-non-nightly-update.outcome == 'success'
