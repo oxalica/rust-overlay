@@ -18,6 +18,19 @@ jobs:
     - name: Install Nix (flakes, nixpkgs-unstable)
       uses: cachix/install-nix-action@v17
 
+    # Flake check consumes tons of memory.
+    - name: Enlarge swap
+      run: |
+        free -h
+        swapon --show
+        SWAP_PATH=$(swapon --show=NAME --noheading | head -n1)
+        sudo swapoff -a
+        sudo fallocate -l 8G "$SWAP_PATH"
+        sudo mkswap "$SWAP_PATH"
+        sudo swapon "$SWAP_PATH"
+        free -h
+        swapon --show
+
     - name: Check flake
       run: nix flake check -v --show-trace --no-update-lock-file
 
@@ -95,7 +108,7 @@ jobs:
           # Old Nix
           - os: ubuntu-latest
             rust-channel: stable
-            profile: stable
+            profile: default
             nixpkgs-channel: nixos-21.11
             nix_install_url: https://releases.nixos.org/nix/nix-2.4/install
 
