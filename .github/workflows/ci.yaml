@@ -6,6 +6,14 @@ on:
     - master
     - dev
 
+  workflow_run:
+    workflows:
+      - sync-channels
+    types:
+      - completed
+    branches:
+      - master
+
 jobs:
   flake-check:
     name: Flake check

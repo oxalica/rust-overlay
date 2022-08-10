@@ -1,19 +1,28 @@
-name: update-stable
+name: Update "stable" branch
 on:
   push:
     branches:
       - master
-    paths:
-      - '*.nix'
-      - '*.sh'
-      - 'manifests/*.nix'
-      - 'manifests/stable/*.nix'
+    paths-ignore:
+      - 'manifests/nightly/**'
+      - 'manifests/beta/**'
+      - 'docs/**'
+      - 'README.md'
 
   workflow_dispatch:
+
+  workflow_run:
+    workflows:
+      - ci
+    types:
+      - completed
+    branches:
+      - master
 
 jobs:
   update-stable:
     name: Update "stable" branch
+    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -22,12 +31,20 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Do we have updates other than nightly or beta?
+        id: check-non-nightly-update
+        continue-on-error: true
+        run: |
+          git diff --name-only stable master | grep -v -E 'manifests/(nightly|beta)|docs|README'
+
       - name: Forward stable -> master
+        if: steps.check-non-nightly-update.outcome == 'success'
         run: |
           git checkout stable
           git merge --ff-only master
 
       - name: Push changes
+        if: steps.check-non-nightly-update.outcome == 'success'
         uses: ad-m/github-push-action@master
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

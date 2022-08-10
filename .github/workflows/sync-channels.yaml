@@ -1,4 +1,4 @@
-name: sync-channels
+name: Sync channels
 on:
   schedule:
     # The nightly channel is usually updated at 01:00:00 UTC.
