@@ -18,6 +18,8 @@ Other channels may be supported but are not guarenteed.
 - nixpkgs-unstable
 - nixos-21.11 (for Linux)
 
+The minimal version of Nix supported is 2.4.
+
 For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
 
 ## Installation

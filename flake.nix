@@ -11,7 +11,10 @@
 
   outputs = { self, nixpkgs, flake-utils }: let
     inherit (nixpkgs.lib)
-      elem filter filterAttrs head isDerivation isString mapAttrs' mapAttrsToList optionalAttrs replaceStrings;
+      elem filterAttrs head mapAttrs mapAttrs' optionalAttrs replaceStrings warnIf;
+
+    inherit (builtins)
+      nixVersion compareVersions;
 
     overlay = import ./.;
 
@@ -31,21 +34,25 @@
     ];
 
   in {
-
-    # Compat.
-    overlay =
-      builtins.trace
-        "[1;31mwarning: rust-overlay's flake output `overlay` is deprecated in favor of `overlays.default`[0m"
-        overlay;
-
     overlays = {
       default = overlay;
       rust-overlay = overlay;
     };
 
+    # Compatible fields.
+    # Put them outside `eachSystem` to suppress duplicated warnings.
+    overlay =
+      warnIf (compareVersions nixVersion "2.7" >= 0)
+        "rust-overlay's flake output `overlay` is deprecated in favor of `overlays.default` for Nix >= 2.7"
+        overlay;
+    defaultPackage =
+      warnIf (compareVersions nixVersion "2.7" >= 0)
+        "rust-overlay's flake output `defaultPackage.<system>` is deprecated in favor of `packages.<system>.default` for Nix >= 2.7"
+        (mapAttrs (_: pkgs: pkgs.default) self.packages);
+
   } // flake-utils.lib.eachSystem allSystems (system: let
     pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
-  in rec {
+  in {
     # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
 
     packages = let

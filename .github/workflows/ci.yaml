@@ -92,6 +92,13 @@ jobs:
             rust-channel: stable
             profile: rust
             nixpkgs-channel: nixpkgs-unstable
+          # Old Nix
+          - os: ubuntu-latest
+            rust-channel: stable
+            profile: stable
+            nixpkgs-channel: nixos-21.11
+            nix_install_url: https://releases.nixos.org/nix/nix-2.4/install
+
     runs-on: ${{ matrix.os }}
     env:
       NIX_SHELL_CMD: nix-shell --pure --argstr channel ${{ matrix.rust-channel }} --argstr profile ${{ matrix.profile }}
@@ -104,6 +111,7 @@ jobs:
       uses: cachix/install-nix-action@v17
       with:
         nix_path: nixpkgs=channel:${{ matrix.nixpkgs-channel }}
+        install_url: ${{ matrix.nix_install_url }}
 
     # Workaround for https://github.com/oxalica/rust-overlay/issues/54
     - name: Don't let ~/.cargo/bin mess things up
