@@ -78,7 +78,7 @@ Here's an example of using it in nixos configuration.
         modules = [
           ./configuration.nix # Your system configuration.
           ({ pkgs, ... }: {
-            nixpkgs.overlays = [ rust-overlay.overlay ];
+            nixpkgs.overlays = [ rust-overlay.overlays.default ];
             environment.systemPackages = [ pkgs.rust-bin.stable.latest.default ];
           })
         ];
