@@ -115,7 +115,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
         devShells.default = mkShell {
           buildInputs = [
             openssl
-            pkgconfig
+            pkg-config
             exa
             fd
             rust-bin.beta.latest.default
