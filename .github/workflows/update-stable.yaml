@@ -16,8 +16,6 @@ on:
       - ci
     types:
       - completed
-    branches:
-      - master
 
 jobs:
   update-stable:

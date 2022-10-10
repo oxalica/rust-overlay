@@ -11,8 +11,6 @@ on:
       - sync-channels
     types:
       - completed
-    branches:
-      - master
 
 jobs:
   flake-check:
