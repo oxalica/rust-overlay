@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
-openssl = "0.10.32"
+openssl = "0.10.42"
