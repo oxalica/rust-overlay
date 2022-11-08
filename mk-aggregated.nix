@@ -29,10 +29,10 @@ symlinkJoin {
   depsTargetTargetPropagated =
     optional (targetPlatform.isDarwin) [ pkgsTargetTarget.libiconv ];
 
+  # If rustc or rustdoc is in the derivation, we need to copy their
+  # executable into the final derivation. This is required
+  # for making them find the correct SYSROOT.
   postBuild = ''
-    # If rustc or rustdoc is in the derivation, we need to copy their
-    # executable into the final derivation. This is required
-    # for making them find the correct SYSROOT.
     for file in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
       if [ -e $file ]; then
         cp --remove-destination "$(realpath -e $file)" $file
@@ -40,9 +40,11 @@ symlinkJoin {
     done
   ''
   # Workaround: https://github.com/rust-lang/rust/pull/103660
+  # FIXME: This duplicates the space usage since `librustc_driver` is huge.
   + lib.optionalString (date == null || date >= "2022-11-01") ''
-    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
+    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri,cargo-clippy,clippy-driver}; do
       if [ -e $file ]; then
+        [[ $file != */*clippy* ]] || cp --remove-destination "$(realpath -e $file)" $file
         chmod +w $file
         ${lib.optionalString stdenv.isLinux ''
           patchelf --set-rpath $out/lib "$file" || true
