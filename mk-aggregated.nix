@@ -1,5 +1,5 @@
 { lib, stdenv, symlinkJoin, pkgsTargetTarget, bash }:
-{ pname, version, selectedComponents, availableComponents ? selectedComponents }:
+{ pname, version, date, selectedComponents, availableComponents ? selectedComponents }:
 let
   inherit (lib) optional;
   inherit (stdenv) targetPlatform;
@@ -33,12 +33,31 @@ symlinkJoin {
     # If rustc or rustdoc is in the derivation, we need to copy their
     # executable into the final derivation. This is required
     # for making them find the correct SYSROOT.
-    for target in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
-      if [ -e $target ]; then
-        cp --remove-destination "$(realpath -e $target)" $target
+    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
+      if [ -e $file ]; then
+        cp --remove-destination "$(realpath -e $file)" $file
       fi
     done
-
+  ''
+  # Workaround: https://github.com/rust-lang/rust/pull/103660
+  + lib.optionalString (date == null || date >= "2022-11-01") ''
+    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
+      if [ -e $file ]; then
+        chmod +w $file
+        ${lib.optionalString stdenv.isLinux ''
+          patchelf --set-rpath $out/lib "$file" || true
+        ''}
+        ${lib.optionalString stdenv.isDarwin ''
+          install_name_tool -add_rpath $out/lib "$file" || true
+        ''}
+      fi
+    done
+    shopt nullglob
+    for file in $out/lib/librustc_driver*; do
+      cp --remove-destination "$(realpath -e $file)" $file
+    done
+  ''
+  + ''
     if [ -e $out/bin/cargo-miri ]; then
       mv $out/bin/{cargo-miri,.cargo-miri-wrapped}
       cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri

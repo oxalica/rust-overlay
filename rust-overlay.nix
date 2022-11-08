@@ -294,7 +294,7 @@ let
       makeOverridable ({ extensions, targets, targetExtensions }:
         mkAggregated {
           pname = "rust-${name}";
-          version = manifest.version;
+          inherit (manifest) version date;
           availableComponents = componentSet.${rustHostPlatform};
           selectedComponents = resolveComponents {
             name = "rust-${name}-${manifest.version}";
@@ -384,6 +384,7 @@ let
   in
     mkAggregated {
       inherit pname version;
+      date = null;
       selectedComponents = attrValues components';
     };
 
