@@ -19,10 +19,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
 
     - name: Install Nix (flakes, nixpkgs-unstable)
-      uses: cachix/install-nix-action@v17
+      uses: cachix/install-nix-action@v18
 
     # Flake check consumes tons of memory.
     - name: Enlarge swap
@@ -46,10 +46,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v17
+      uses: cachix/install-nix-action@v18
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
@@ -124,10 +124,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v17
+      uses: cachix/install-nix-action@v18
       with:
         nix_path: nixpkgs=channel:${{ matrix.nixpkgs-channel }}
         install_url: ${{ matrix.nix_install_url }}
@@ -173,10 +173,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3.0.2
+      uses: actions/checkout@v3
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v17
+      uses: cachix/install-nix-action@v18
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
