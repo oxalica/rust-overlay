@@ -97,4 +97,7 @@
   _95 = "mipsisa64r6-unknown-linux-gnuabi64";
   _96 = "mipsisa64r6el-unknown-linux-gnuabi64";
   _97 = "x86_64-unknown-none";
+  _98 = "aarch64-unknown-uefi";
+  _99 = "i686-unknown-uefi";
+  _100 = "x86_64-unknown-uefi";
 }
