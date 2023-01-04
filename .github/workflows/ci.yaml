@@ -8,7 +8,7 @@ on:
 
   workflow_run:
     workflows:
-      - sync-channels
+      - Sync channels
     types:
       - completed
 
@@ -161,7 +161,6 @@ jobs:
 
   test-cross-examples:
     name: Test cross compilation examples
-    if: ${{ github.event.workflow_run.conclusion != 'failure' }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
