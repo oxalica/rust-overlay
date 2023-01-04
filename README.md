@@ -13,12 +13,8 @@ no need to have network access. It also works well with [Nix Flakes](https://nix
 - Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
   (which are randomly picked and may change over time).
 
-rust-overlay is targeting these channels and they are tested on CI.
-Other channels may be supported but are not guarenteed.
-- nixpkgs-unstable
-- nixos-21.11 (for Linux)
-
-The minimal version of Nix supported is 2.4.
+rust-overlay targets nixos-unstable and supported releases of NixOS, on x86_64-linux.
+They are tested on CI. It may also work on other channels but is not guarenteed.
 
 For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
 
@@ -224,6 +220,10 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
 - [Reference of all public attributes](docs/reference.md)
 - [Cross compilation](docs/cross_compilation.md)
+
+## License
+
+MIT licensed.
 
 [nixpkgs-mozilla]: https://github.com/mozilla/nixpkgs-mozilla
 [rust-toolchain]: https://rust-lang.github.io/rustup/overrides.html#the-toolchain-file
