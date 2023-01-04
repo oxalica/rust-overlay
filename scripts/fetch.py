@@ -3,6 +3,7 @@
 from pathlib import Path
 import base64
 import datetime
+import os
 import re
 import sys
 import time
@@ -25,6 +26,11 @@ RENAMES_PATH = Path('manifests/renames.nix')
 PROFILES_PATH = Path('manifests/profiles.nix')
 
 RE_STABLE_VERSION = re.compile(r'^\d+\.\d+\.\d+$')
+
+GITHUB_TOKEN_HEADERS = {}
+if 'GITHUB_TOKEN' in os.environ:
+    print('Using GITHUB_TOKEN from environment')
+    GITHUB_TOKEN_HEADERS['Authorization'] = f'Bearer {os.environ["GITHUB_TOKEN"]}'
 
 def to_base64(hash: str) -> str:
     assert len(hash) == 64
@@ -104,12 +110,12 @@ def compress_profiles(profiles: dict) -> int:
         f.write(']\n')
     return idx
 
-def fetch_url(url: str, params=None, allow_not_found=False):
+def fetch_url(url: str, params=None, headers={}, allow_not_found=False):
     i = 0
     while True:
         resp = None
         try:
-            resp = requests.get(url, params=params)
+            resp = requests.get(url, params=params, headers=headers)
             if resp.status_code == 404 and allow_not_found:
                 return None
             resp.raise_for_status()
@@ -256,6 +262,7 @@ def sync_stable_channel(*, stop_if_exists, max_update=None):
         resp = fetch_url(
             GITHUB_TAGS_URL,
             params={'per_page': PER_PAGE, 'page': page},
+            headers=GITHUB_TOKEN_HEADERS,
         ).json()
         versions.extend(
             tag['name']

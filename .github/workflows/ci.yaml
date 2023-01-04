@@ -67,12 +67,18 @@ jobs:
         done
 
     - name: Re-fetch latest stable
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py stable
 
     - name: Re-fetch latest beta
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py beta
 
     - name: Re-fetch latest nightly
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py nightly
 
     - name: Verify file changes

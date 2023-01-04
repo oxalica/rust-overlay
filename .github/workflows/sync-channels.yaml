@@ -29,14 +29,20 @@ jobs:
 
     - name: Sync stable channel
       timeout-minutes: 5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py stable
 
     - name: Sync beta channel
       timeout-minutes: 5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py beta
 
     - name: Sync nightly channel
       timeout-minutes: 5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py nightly
 
     - name: Check and commit changes
