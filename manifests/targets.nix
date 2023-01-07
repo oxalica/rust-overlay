@@ -100,4 +100,6 @@
   _98 = "aarch64-unknown-uefi";
   _99 = "i686-unknown-uefi";
   _100 = "x86_64-unknown-uefi";
+  _101 = "aarch64-unknown-fuchsia";
+  _102 = "x86_64-unknown-fuchsia";
 }
