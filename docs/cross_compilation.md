@@ -4,7 +4,7 @@ There are examples for cross compilation in [`example` directory](../examples).
 To try examples,
 1. `cd` into `example/cross-aarch64` (or other directory).
 2. `nix-shell` to enter the development environment.
-3. `make run` to build and run the program in an emulater.
+3. `make run` to build and run the program in an emulator.
 
 The structure of `shell.nix` should like this,
 ```nix
