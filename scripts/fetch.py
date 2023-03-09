@@ -1,9 +1,10 @@
 #!/usr/bin/env nix-shell
-#!nix-shell -i python3 -p "python3.withPackages (ps: with ps; [ toml requests ])"
+#!nix-shell -i python3 -p "python3.withPackages (ps: with ps; [ toml requests typing-extensions ])"
+from datetime import date
 from pathlib import Path
+from typing import Any, TextIO
+from typing_extensions import Self
 import base64
-import datetime
-import os
 import re
 import sys
 import time
@@ -13,24 +14,14 @@ import toml
 
 MAX_TRIES = 3
 RETRY_DELAY = 3.0
-SYNC_MAX_UPDATE = 32
 
-MIN_STABLE_VERSION = '1.29.0'
-MIN_BETA_DATE = MIN_NIGHTLY_DATE = datetime.date.fromisoformat('2018-09-13')
+MIN_DATE = date.fromisoformat('2018-09-13') # 1.29.0
 
 DIST_ROOT = 'https://static.rust-lang.org/dist'
+
 NIX_KEYWORDS = {'', 'if', 'then', 'else', 'assert', 'with', 'let', 'in', 'rec', 'inherit', 'or'}
-MANIFEST_TMP_PATH = Path('manifest.tmp')
-TARGETS_PATH = Path('manifests/targets.nix')
-RENAMES_PATH = Path('manifests/renames.nix')
-PROFILES_PATH = Path('manifests/profiles.nix')
-
-RE_STABLE_VERSION = re.compile(r'^\d+\.\d+\.\d+$')
-
-GITHUB_TOKEN_HEADERS = {}
-if 'GITHUB_TOKEN' in os.environ:
-    print('Using GITHUB_TOKEN from environment')
-    GITHUB_TOKEN_HEADERS['Authorization'] = f'Bearer {os.environ["GITHUB_TOKEN"]}'
+MANIFEST_TMP_PATH = Path('/tmp/manifest.toml') # For debug.
+MANIFESTS_DIR = Path('manifests')
 
 def to_base64(hash: str) -> str:
     assert len(hash) == 64
@@ -49,12 +40,92 @@ def escape_nix_key(name: str) -> str:
         return name
     return escape_nix_string(name)
 
-def parse_version(ver: str) -> tuple:
-    return tuple(map(int, ver.split('.')))
+class RustVersion:
+    channel: str
+    version: str
 
-def version_less(a: str, b: str):
-    return parse_version(a) < parse_version(b)
+    def __init__(self, version: str) -> None:
+        self.version = version
 
+    def __str__(self) -> str:
+        return f'{self.channel}-{self.version}'
+
+    def manifest_url(self) -> str:
+        raise NotImplementedError()
+
+    @classmethod
+    def manifest_dir(cls) -> Path:
+        return MANIFESTS_DIR / cls.channel
+
+    def manifest_path(self) -> Path:
+        raise NotImplementedError()
+
+class RustStable(RustVersion):
+    # Only accept 3-parts versions here. See also `ManifestIndex.RE_LINE`.
+    RE_STABLE_VERSION = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
+    channel = 'stable'
+    dat: date | None
+
+    def __init__(self, version: str, dat: date | None = None) -> None:
+        m = self.RE_STABLE_VERSION.match(version)
+        assert m is not None, f'Invalid stable version: {version}'
+        super().__init__(version)
+        self.dat = dat
+
+    def manifest_url(self) -> str:
+        return f'{DIST_ROOT}/channel-rust-{self.version}.toml'
+
+    def manifest_path(self) -> Path:
+        return self.manifest_dir() / f'{self.version}.nix'
+
+class RustNightly(RustVersion):
+    channel = 'nightly'
+    dat: date
+
+    def __init__(self, dat: date) -> None:
+        super().__init__(dat.isoformat())
+        self.dat = dat
+
+    def manifest_url(self) -> str:
+        return f'{DIST_ROOT}/{self.version}/channel-rust-{self.channel}.toml'
+
+    def manifest_path(self) -> Path:
+        return self.manifest_dir() / str(self.dat.year) / f'{self.version}.nix'
+
+class RustBeta(RustNightly):
+    channel = 'beta'
+
+# https://github.com/rust-lang/generate-manifest-list
+class ManifestIndex:
+    DIST_INDEX_URL = 'https://static.rust-lang.org/manifests.txt'
+    # NB. Only match 3-parts version like `1.67.0`, which only appears once (except 1.8.0).
+    # 2-parts version like `1.67` appears every time a new patch release is out.
+    RE_LINE = re.compile(r'/dist/([0-9]{4}-[0-9]{2}-[0-9]{2})/channel-rust-(beta|nightly|[0-9]+\.[0-9]+\.[0-9]+).toml$', re.M)
+
+    stable: list[RustStable]
+    nightly: list[RustNightly]
+    beta: list[RustBeta]
+
+    def __init__(self, content: str) -> None:
+        self.stable, self.beta, self.nightly = [], [], []
+        for m in self.RE_LINE.finditer(content):
+            dat = date.fromisoformat(m[1])
+            version = m[2]
+            match version:
+                case 'beta':
+                    self.beta.append(RustBeta(dat))
+                case 'nightly':
+                    self.nightly.append(RustNightly(dat))
+                case _:
+                    self.stable.append(RustStable(version, dat))
+
+    @classmethod
+    def fetch(cls) -> Self:
+        print('Fetching manifest index')
+        index = fetch_url(cls.DIST_INDEX_URL).text
+        return cls(index)
+
+TARGETS_PATH = MANIFESTS_DIR / 'targets.nix'
 target_map = dict((line.split('"')[1], i) for i, line in enumerate(TARGETS_PATH.read_text().strip().split('\n')[1:-1]))
 def compress_target(target: str) -> str:
     assert '"' not in target
@@ -72,6 +143,7 @@ def compress_target(target: str) -> str:
         f.write('}\n')
     return f'_{idx}'
 
+RENAMES_PATH = MANIFESTS_DIR / 'renames.nix'
 renames_map = dict((line.strip(), i) for i, line in enumerate(RENAMES_PATH.read_text().strip().split('\n')[1:-1]))
 def compress_renames(renames: dict) -> int:
     serialized = '{ ' + ''.join(
@@ -91,6 +163,7 @@ def compress_renames(renames: dict) -> int:
         f.write(']\n')
     return idx
 
+PROFILES_PATH = MANIFESTS_DIR / 'profiles.nix'
 profiles_map = dict((line.strip(), i) for i, line in enumerate(PROFILES_PATH.read_text().strip().split('\n')[1:-1]))
 def compress_profiles(profiles: dict) -> int:
     serialized = '{ ' + ''.join(
@@ -110,26 +183,23 @@ def compress_profiles(profiles: dict) -> int:
         f.write(']\n')
     return idx
 
-def fetch_url(url: str, params=None, headers={}, allow_not_found=False):
+def fetch_url(url: str, params=None, headers={}) -> requests.Response:
     i = 0
     while True:
-        resp = None
         try:
             resp = requests.get(url, params=params, headers=headers)
-            if resp.status_code == 404 and allow_not_found:
-                return None
             resp.raise_for_status()
             return resp
         except requests.exceptions.RequestException as e:
             i += 1
-            if (resp is not None and resp.status_code == 404) or i >= MAX_TRIES:
+            if i >= MAX_TRIES:
                 raise
             print(e)
             time.sleep(RETRY_DELAY)
 
-def translate_dump_manifest(channel: str, manifest: str, f):
-    manifest = toml.loads(manifest)
-    date = manifest['date']
+def translate_dump_manifest(channel: str, manifest_content: str, f: TextIO):
+    manifest: dict[str, Any] = toml.loads(manifest_content)
+    dat = manifest['date']
     rustc_version = manifest['pkg']['rustc']['version'].split()[0]
     renames_idx = compress_renames(manifest['renames'])
     strip_tail = '-preview'
@@ -138,7 +208,7 @@ def translate_dump_manifest(channel: str, manifest: str, f):
 
     f.write('{')
     f.write(f'v={escape_nix_string(rustc_version)};')
-    f.write(f'd={escape_nix_string(date)};')
+    f.write(f'd={escape_nix_string(dat)};')
     f.write(f'r={renames_idx};')
     if 'profiles' in manifest:
         f.write(f'p={compress_profiles(manifest["profiles"])};')
@@ -156,7 +226,7 @@ def translate_dump_manifest(channel: str, manifest: str, f):
                 continue
             url = target['xz_url']
             target_tail = '' if target_name == '*' else '-' + target_name
-            start = f'{DIST_ROOT}/{date}/{pkg_name_stripped}-'
+            start = f'{DIST_ROOT}/{dat}/{pkg_name_stripped}-'
             end = f'{target_tail}.tar.xz'
 
             # Occurs in nightly-2019-01-10. Maybe broken or hirarerchy change?
@@ -198,34 +268,31 @@ def translate_dump_manifest(channel: str, manifest: str, f):
                 url = DIST_ROOT + url[7:]
             hash = to_base64(target['xz_hash']) # Hash must not contains quotes.
             target_tail = '' if target_name == '*' else '-' + target_name
-            expect_url = f'https://static.rust-lang.org/dist/{date}/{pkg_name_stripped}-{url_version}{target_tail}.tar.xz'
+            expect_url = f'https://static.rust-lang.org/dist/{dat}/{pkg_name_stripped}-{url_version}{target_tail}.tar.xz'
             assert url == expect_url, f'Unexpected url: {url}, expecting: {expect_url}'
             f.write(f'{compress_target(target_name)}="{hash}";')
 
         f.write('};')
     f.write('}\n')
 
-# Fetch and translate manifest file and return if it is successfully fetched.
-def fetch_manifest(channel: str, version: str, out_path: Path) -> bool:
+# Fetch, translate and save a manifest file.
+def update_manifest(version: RustVersion):
+    out_path = version.manifest_path()
     out_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_path = out_path.with_suffix('.tmp')
-    print(f'Fetching {channel} {version}')
-    if channel == 'stable':
-        url = f'{DIST_ROOT}/channel-rust-{version}.toml'
-    else:
-        url = f'{DIST_ROOT}/{version}/channel-rust-{channel}.toml'
-    manifest = fetch_url(url, allow_not_found=channel != 'stable')
-    if manifest is None:
-        print('Not found, skipped')
-        return False
-    manifest = manifest.text
+    print(f'Fetching {version}')
+    manifest = fetch_url(version.manifest_url()).text
     MANIFEST_TMP_PATH.write_text(manifest)
     with open(tmp_path, 'w') as fout:
-        translate_dump_manifest(channel, manifest, fout)
+        translate_dump_manifest(version.channel, manifest, fout)
     tmp_path.rename(out_path)
-    return True
 
-def update_stable_index(dir=Path('manifests/stable')):
+def update_stable_index():
+    dir = RustStable.manifest_dir()
+
+    def parse_version(ver: str) -> tuple:
+        return tuple(map(int, ver.split('.')))
+
     versions = sorted(
         (file.stem for file in dir.iterdir() if file.stem != 'default' and file.suffix == '.nix'),
         key=parse_version,
@@ -238,9 +305,9 @@ def update_stable_index(dir=Path('manifests/stable')):
         f.write('}\n')
 
 def update_beta_index():
-    update_nightly_index(dir=Path('manifests/beta'))
+    update_nightly_index(dir=RustBeta.manifest_dir())
 
-def update_nightly_index(dir=Path('manifests/nightly')):
+def update_nightly_index(*, dir=RustNightly.manifest_dir()):
     dates = sorted(file.stem for file in dir.rglob('*.nix') if file.stem != 'default')
     with open(str(dir / 'default.nix'), 'w') as f:
         f.write('{\n')
@@ -250,134 +317,46 @@ def update_nightly_index(dir=Path('manifests/nightly')):
         f.write(f'  latest = {escape_nix_string(dates[-1])};\n')
         f.write('}\n')
 
-def sync_stable_channel(*, stop_if_exists, max_update=None):
-    GITHUB_TAGS_URL = 'https://api.github.com/repos/rust-lang/rust/tags'
-    PER_PAGE = 100
-
-    versions = []
-    page = 0
-    while True:
-        page += 1
-        print(f'Fetching tags page {page}')
-        resp = fetch_url(
-            GITHUB_TAGS_URL,
-            params={'per_page': PER_PAGE, 'page': page},
-            headers=GITHUB_TOKEN_HEADERS,
-        ).json()
-        versions.extend(
-            tag['name']
-            for tag in resp
-            if RE_STABLE_VERSION.match(tag['name'])
-            and not version_less(tag['name'], MIN_STABLE_VERSION)
-        )
-        if len(resp) < PER_PAGE:
-            break
-    versions.sort(key=parse_version, reverse=True)
-
-    print(f'Got {len(versions)} releases')
-
-    processed = 0
-    for version in versions:
-        out_path = Path(f'manifests/stable/{version}.nix')
-        if out_path.exists():
-            if not stop_if_exists:
-                continue
-            print(f'{version} is already fetched. Stopped')
-            break
-        assert fetch_manifest('stable', version, out_path), f'Stable version {version} not found'
-        processed += 1
-        assert max_update is None or processed <= max_update, 'Too many versions'
-    update_stable_index()
-
-def sync_beta_channel(*, stop_if_exists, max_update=None):
-    # Fetch the global nightly manifest to retrive the latest nightly version.
-    print('Fetching latest beta version')
-    manifest = fetch_url(f'{DIST_ROOT}/channel-rust-beta.toml').text
-    date = datetime.date.fromisoformat(toml.loads(manifest)['date'])
-    print(f'The latest beta version is {date}')
-
-    processed = 0
-    date += datetime.timedelta(days=1)
-    while date > MIN_BETA_DATE:
-        date -= datetime.timedelta(days=1)
-        date_str = date.isoformat()
-        out_path = Path(f'manifests/beta/{date.year}/{date_str}.nix')
-        if out_path.exists():
-            if not stop_if_exists:
-                continue
-            print(f'{date_str} is already fetched. Stopped')
-            break
-        if fetch_manifest('beta', date_str, out_path):
-            processed += 1
-        assert max_update is None or processed <= max_update, 'Too many versions'
-    update_beta_index()
-
-def sync_nightly_channel(*, stop_if_exists, max_update=None):
-    # Fetch the global nightly manifest to retrive the latest nightly version.
-    print('Fetching latest nightly version')
-    manifest = fetch_url(f'{DIST_ROOT}/channel-rust-nightly.toml').text
-    date = datetime.date.fromisoformat(toml.loads(manifest)['date'])
-    print(f'The latest nightly version is {date}')
-
-    processed = 0
-    date += datetime.timedelta(days=1)
-    while date > MIN_NIGHTLY_DATE:
-        date -= datetime.timedelta(days=1)
-        date_str = date.isoformat()
-        out_path = Path(f'manifests/nightly/{date.year}/{date_str}.nix')
-        if out_path.exists():
-            if not stop_if_exists:
-                continue
-            print(f'{date_str} is already fetched. Stopped')
-            break
-        if fetch_manifest('nightly', date_str, out_path):
-            processed += 1
-        assert max_update is None or processed <= max_update, 'Too many versions'
-    update_nightly_index()
-
 def main():
-    args = sys.argv[1:]
-    if len(args) == 1 and args[0] in ['stable', 'beta', 'nightly']:
-        {
-            'stable': sync_stable_channel,
-            'beta': sync_beta_channel,
-            'nightly': sync_nightly_channel,
-        }[args[0]](stop_if_exists=True, max_update=SYNC_MAX_UPDATE)
-    elif len(args) == 2 and args[0] == 'stable':
-        if args[1] == 'all':
-            sync_stable_channel(stop_if_exists=False)
-        else:
-            version = args[1]
-            assert RE_STABLE_VERSION.match(version), 'Invalid version'
-            fetch_manifest('stable', version, Path(f'manifests/stable/{version}.nix'))
+    match sys.argv[1:]:
+        case []:
+            index = ManifestIndex.fetch()
+
+            pending = []
+            for version in index.stable + index.beta + index.nightly:
+                assert version.dat is not None
+                if version.dat >= MIN_DATE and not version.manifest_path().exists():
+                    pending.append(version)
+
+            if not pending:
+                print('Up to date')
+                return
+            print(f'Pending {len(pending)} updates: {", ".join(str(v) for v in pending)}')
+
+            for version in pending:
+                update_manifest(version)
             update_stable_index()
-    elif len(args) == 2 and args[0] == 'beta':
-        if args[1] == 'all':
-            sync_beta_channel(stop_if_exists=False)
-        else:
-            date = datetime.date.fromisoformat(args[1])
-            date_str = date.isoformat()
-            fetch_manifest('beta', date_str, Path(f'manifests/beta/{date.year}/{date_str}.nix'))
             update_beta_index()
-    elif len(args) == 2 and args[0] == 'nightly':
-        if args[1] == 'all':
-            sync_nightly_channel(stop_if_exists=False)
-        else:
-            date = datetime.date.fromisoformat(args[1])
-            date_str = date.isoformat()
-            fetch_manifest('nightly', date_str, Path(f'manifests/nightly/{date.year}/{date_str}.nix'))
             update_nightly_index()
-    else:
-        print('''
+        case ['stable', version]:
+            update_manifest(RustStable(version))
+            update_stable_index()
+        case ['beta', date_str]:
+            update_manifest(RustBeta(date.fromisoformat(date_str)))
+            update_beta_index()
+        case ['nightly', date_str]:
+            update_manifest(RustNightly(date.fromisoformat(date_str)))
+            update_nightly_index()
+        case _:
+            arg0 = sys.argv[0]
+            print(f'''
 Usage:
-    {0} <channel>
-        Auto-sync new versions from a channel.
-    {0} <channel> <version>
-        Force to fetch a specific version from a channel.
-    {0} <channel> all
-        Force to fetch all versions.
-'''.format(sys.argv[0]))
-        exit(1)
+    {arg0} <channel>
+        Synchronize all new stable, beta and nightly versions.
+    {arg0} <channel> <version>
+        Fetch a specific channel and version.
+''')
+            exit(1)
 
 if __name__ == '__main__':
     main()
