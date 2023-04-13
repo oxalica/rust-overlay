@@ -39,14 +39,23 @@ let
         optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" "rust" ]) zlib ++
         optional linksToRustc self.rustc;
 
-      # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux.
+      # Most of binaries links to `libgcc.so` on Linux, which lives in `gccForLibs.libgcc`
+      # since https://github.com/NixOS/nixpkgs/pull/209870
+      # See https://github.com/oxalica/rust-overlay/issues/121
+      #
+      # Nightly `rustc` since 2022-02-17 links to `libstdc++.so.6` on Linux,
+      # which lives in `gccForLibs.lib`.
       # https://github.com/oxalica/rust-overlay/issues/73
+      # See https://github.com/oxalica/rust-overlay/issues/73
+      #
+      # FIXME: `libstdc++.so` is not necessary now. Figure out the time point
+      # of it so we can use `gccForLibs.libgcc` instead.
       #
       # N.B. `gcc` is a compiler which is sensitive to `targetPlatform`.
       # We use `depsHostHost` instead of `buildInputs` to force it ignore the target,
       # since binaries produced by `rustc` don't actually relies on this gccForLibs.
       depsHostHost =
-        optional (!dontFixup && !hostPlatform.isDarwin && pname == "rustc") gccForLibs.lib;
+        optional (!dontFixup && !hostPlatform.isDarwin) gccForLibs.lib;
 
       dontConfigure = true;
       dontBuild = true;
