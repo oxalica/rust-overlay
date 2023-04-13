@@ -13,32 +13,7 @@ on:
       - completed
 
 jobs:
-  flake-check:
-    name: Flake check
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-
-    - name: Install Nix (flakes, nixpkgs-unstable)
-      uses: cachix/install-nix-action@v18
-
-    # Flake check consumes tons of memory.
-    - name: Enlarge swap
-      run: |
-        free -h
-        swapon --show
-        SWAP_PATH=$(swapon --show=NAME --noheading | head -n1)
-        sudo swapoff -a
-        sudo fallocate -l 8G "$SWAP_PATH"
-        sudo mkswap "$SWAP_PATH"
-        sudo swapon "$SWAP_PATH"
-        free -h
-        swapon --show
-
-    - name: Check flake
-      run: nix flake check -v --show-trace --no-update-lock-file
+  # TODO: `nix flake check` costs too much time and memory for GitHub Actions machines.
 
   check-sync-script:
     name: Check sync script is deterministic
