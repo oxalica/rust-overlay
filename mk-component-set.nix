@@ -80,6 +80,14 @@ let
         fi
       '';
 
+      # Adapation for https://github.com/NixOS/nixpkgs/pull/209870;
+      # something similar will go upstream in nixpkgs for all
+      # autoPatchelfHook users.  When it does, this can be dropped.
+      preFixup = lib.optionalString (stdenv?cc.cc.libgcc) ''
+        set -x
+        addAutoPatchelfSearchPath ${stdenv.cc.cc.libgcc}/lib
+      '';
+
       # Only contain tons of html files. Don't waste time scanning files.
       dontFixup = elem pname [ "rust-docs" "rustc-docs" ];
 
