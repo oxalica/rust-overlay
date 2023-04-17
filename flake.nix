@@ -5,11 +5,13 @@
   '';
 
   inputs = {
+    # See: https://github.com/nix-systems/nix-systems
+    systems.url = "path:./systems.nix";
+    systems.flake = false;
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
   };
 
-  outputs = { self, nixpkgs, flake-utils }: let
+  outputs = { self, systems, nixpkgs }: let
     inherit (nixpkgs.lib)
       elem filterAttrs head mapAttrs mapAttrs' optionalAttrs replaceStrings warnIf;
 
@@ -18,20 +20,19 @@
 
     overlay = import ./.;
 
-    allSystems = [
-      "aarch64-darwin"
-      "aarch64-linux"
-      "armv5tel-linux"
-      "armv6l-linux"
-      "armv7a-linux"
-      "armv7l-linux"
-      "i686-linux"
-      # "mipsel-linux" # Missing `busybox`.
-      "powerpc64le-linux"
-      "riscv64-linux"
-      "x86_64-darwin"
-      "x86_64-linux"
-    ];
+    eachSystem = nixpkgs.lib.genAttrs (import systems);
+
+    overlayOutputFor = system:
+      # Prefer to reuse may-be-evaluated flake output.
+      if nixpkgs ? legacyPackages.${system} then
+        let
+          super = nixpkgs.legacyPackages.${system};
+          final = super // overlay final super;
+        in
+          final
+      # Otherwise, fallback to import.
+      else
+        import nixpkgs { inherit system; overlays = [ overlay ]; };
 
   in {
     overlays = {
@@ -50,41 +51,43 @@
         "rust-overlay's flake output `defaultPackage.<system>` is deprecated in favor of `packages.<system>.default` for Nix >= 2.7"
         (mapAttrs (_: pkgs: pkgs.default) self.packages);
 
-  } // flake-utils.lib.eachSystem allSystems (system: let
-    pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
-  in {
-    # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
+    # TODO: Flake outputs other than `overlay[s]` are not stabilized yet.
 
     packages = let
       select = version: comps: if version == "latest" then null else comps.default or null;
-      result =
+      resultOf = rust-bin:
         mapAttrs' (version: comps: {
           name = "rust_${replaceStrings ["."] ["_"] version}";
           value = select version comps;
-        }) pkgs.rust-bin.stable //
+        }) rust-bin.stable //
         mapAttrs' (version: comps: {
           name = "rust-nightly_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.nightly //
+        }) rust-bin.nightly //
         mapAttrs' (version: comps: {
           name = "rust-beta_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.beta //
+        }) rust-bin.beta //
         rec {
-          rust = pkgs.rust-bin.stable.latest.default;
-          rust-beta = pkgs.rust-bin.beta.latest.default;
-          rust-nightly = pkgs.rust-bin.nightly.latest.default;
+          rust = rust-bin.stable.latest.default;
+          rust-beta = rust-bin.beta.latest.default;
+          rust-nightly = rust-bin.nightly.latest.default;
           default = rust;
         };
-    in filterAttrs (name: drv: drv != null) result;
+    in
+      eachSystem (system:
+        filterAttrs (name: drv: drv != null)
+          (resultOf ((overlayOutputFor system).rust-bin)));
 
-    checks = let
-      inherit (pkgs) rust-bin rustChannelOf;
-      inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
+    checks = eachSystem (system: let
+      pkgs = nixpkgs.legacyPackages.${system};
+
+      inherit (overlayOutputFor system) rust-bin rustChannelOf latest;
+      inherit (rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
 
       rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
-      assertEq = (flake-utils.lib.check-utils system).isEqual;
+      assertEq = lhs: rhs: assert lhs == rhs; pkgs.runCommandNoCCLocal "OK" { } ">$out";
       assertUrl = drv: url: assertEq (head drv.src.urls) url;
     in
       # Check only tier 1 targets.
@@ -108,9 +111,9 @@
         rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
 
-        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rustc stable.latest.rustc;
-        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rustc beta.latest.rustc;
-        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rustc nightly.latest.rustc;
+        latest-stable-legacy = assertEq latest.rustChannels.stable.rustc stable.latest.rustc;
+        latest-beta-legacy = assertEq latest.rustChannels.beta.rustc beta.latest.rustc;
+        latest-nightly-legacy = assertEq latest.rustChannels.nightly.rustc nightly.latest.rustc;
 
         rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rustc stable.latest.rustc;
         rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rustc beta.latest.rustc;
@@ -167,6 +170,6 @@
           targets = [ "x86_64-apple-darwin" ];
           targetExtensions = [ "rust-docs" ];
         };
-      };
-  });
+      });
+  };
 }
