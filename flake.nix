@@ -22,8 +22,17 @@
 
     eachSystem = nixpkgs.lib.genAttrs (import systems);
 
-    # TODO: Reduce imports.
-    pkgsFor = system: import nixpkgs { inherit system; overlays = [ overlay ]; };
+    overlayOutputFor = system:
+      # Prefer to reuse may-be-evaluated flake output.
+      if nixpkgs ? legacyPackages.${system} then
+        let
+          super = nixpkgs.legacyPackages.${system};
+          final = super // overlay final super;
+        in
+          final
+      # Otherwise, fallback to import.
+      else
+        import nixpkgs { inherit system; overlays = [ overlay ]; };
 
   in {
     overlays = {
@@ -46,35 +55,35 @@
 
     packages = let
       select = version: comps: if version == "latest" then null else comps.default or null;
-      resultOf = pkgs:
+      resultOf = rust-bin:
         mapAttrs' (version: comps: {
           name = "rust_${replaceStrings ["."] ["_"] version}";
           value = select version comps;
-        }) pkgs.rust-bin.stable //
+        }) rust-bin.stable //
         mapAttrs' (version: comps: {
           name = "rust-nightly_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.nightly //
+        }) rust-bin.nightly //
         mapAttrs' (version: comps: {
           name = "rust-beta_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.beta //
+        }) rust-bin.beta //
         rec {
-          rust = pkgs.rust-bin.stable.latest.default;
-          rust-beta = pkgs.rust-bin.beta.latest.default;
-          rust-nightly = pkgs.rust-bin.nightly.latest.default;
+          rust = rust-bin.stable.latest.default;
+          rust-beta = rust-bin.beta.latest.default;
+          rust-nightly = rust-bin.nightly.latest.default;
           default = rust;
         };
     in
       eachSystem (system:
         filterAttrs (name: drv: drv != null)
-          (resultOf (pkgsFor system)));
+          (resultOf ((overlayOutputFor system).rust-bin)));
 
     checks = eachSystem (system: let
-      pkgs = pkgsFor system;
+      pkgs = nixpkgs.legacyPackages.${system};
 
-      inherit (pkgs) rust-bin rustChannelOf;
-      inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
+      inherit (overlayOutputFor system) rust-bin rustChannelOf latest;
+      inherit (rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
 
       rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
@@ -102,9 +111,9 @@
         rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
 
-        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rustc stable.latest.rustc;
-        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rustc beta.latest.rustc;
-        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rustc nightly.latest.rustc;
+        latest-stable-legacy = assertEq latest.rustChannels.stable.rustc stable.latest.rustc;
+        latest-beta-legacy = assertEq latest.rustChannels.beta.rustc beta.latest.rustc;
+        latest-nightly-legacy = assertEq latest.rustChannels.nightly.rustc nightly.latest.rustc;
 
         rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rustc stable.latest.rustc;
         rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rustc beta.latest.rustc;
