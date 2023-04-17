@@ -9,11 +9,9 @@
     systems.url = "path:./systems.nix";
     systems.flake = false;
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
-    flake-utils.inputs.systems.follows = "systems";
   };
 
-  outputs = { self, systems, nixpkgs, flake-utils }: let
+  outputs = { self, systems, nixpkgs }: let
     inherit (nixpkgs.lib)
       elem filterAttrs head mapAttrs mapAttrs' optionalAttrs replaceStrings warnIf;
 
@@ -22,7 +20,10 @@
 
     overlay = import ./.;
 
-    allSystems = import systems;
+    eachSystem = nixpkgs.lib.genAttrs (import systems);
+
+    # TODO: Reduce imports.
+    pkgsFor = system: import nixpkgs { inherit system; overlays = [ overlay ]; };
 
   in {
     overlays = {
@@ -41,14 +42,11 @@
         "rust-overlay's flake output `defaultPackage.<system>` is deprecated in favor of `packages.<system>.default` for Nix >= 2.7"
         (mapAttrs (_: pkgs: pkgs.default) self.packages);
 
-  } // flake-utils.lib.eachSystem allSystems (system: let
-    pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
-  in {
-    # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
+    # TODO: Flake outputs other than `overlay[s]` are not stabilized yet.
 
     packages = let
       select = version: comps: if version == "latest" then null else comps.default or null;
-      result =
+      resultOf = pkgs:
         mapAttrs' (version: comps: {
           name = "rust_${replaceStrings ["."] ["_"] version}";
           value = select version comps;
@@ -67,15 +65,20 @@
           rust-nightly = pkgs.rust-bin.nightly.latest.default;
           default = rust;
         };
-    in filterAttrs (name: drv: drv != null) result;
+    in
+      eachSystem (system:
+        filterAttrs (name: drv: drv != null)
+          (resultOf (pkgsFor system)));
 
-    checks = let
+    checks = eachSystem (system: let
+      pkgs = pkgsFor system;
+
       inherit (pkgs) rust-bin rustChannelOf;
       inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
 
       rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
-      assertEq = (flake-utils.lib.check-utils system).isEqual;
+      assertEq = lhs: rhs: assert lhs == rhs; pkgs.runCommandNoCCLocal "OK" { } ">$out";
       assertUrl = drv: url: assertEq (head drv.src.urls) url;
     in
       # Check only tier 1 targets.
@@ -158,6 +161,6 @@
           targets = [ "x86_64-apple-darwin" ];
           targetExtensions = [ "rust-docs" ];
         };
-      };
-  });
+      });
+  };
 }
