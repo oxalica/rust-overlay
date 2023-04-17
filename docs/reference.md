@@ -83,4 +83,4 @@ All public attributes provided by the overlay are below. Fields not defined here
 }
 ```
 
-For more details, see also the source code of [`default.nix`](../default.nix) and [`lib.nix`](../lib.nix).
+For more details, see also the source code of [`rust-overlay.nix`](../rust-overlay.nix).

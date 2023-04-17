@@ -82,20 +82,13 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         rust-channel: [stable, beta, nightly]
         profile: [minimal, default]
-        nixpkgs-channel: [nixpkgs-unstable, nixos-22.05]
-        exclude:
-          # Stable channel is not for macOS.
-          - os: macos-latest
-            nixpkgs-channel: nixos-22.05
+        nixpkgs-channel: [nixpkgs-unstable, nixos-22.11]
         include:
           # The legacy package, used by compatible functions.
           - os: ubuntu-latest
             rust-channel: stable
             profile: rust
             nixpkgs-channel: nixpkgs-unstable
-          # Use old Nix for stable channels.
-          - nixpkgs-channel: nixos-22.05
-            nix_install_url: https://releases.nixos.org/nix/nix-2.8.1/install
 
     runs-on: ${{ matrix.os }}
     env:

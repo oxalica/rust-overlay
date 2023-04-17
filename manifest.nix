@@ -1,14 +1,15 @@
-# Manifests which describe the content of each version.
-{ lib, distRoot }:
+final: prev:
 let
   inherit (builtins) match isString toString;
 
-  inherit (lib)
+  inherit (final.lib)
     attrNames concatMap elemAt filter hasAttr mapAttrs mapAttrs' removeSuffix;
 
   targets = import ./manifests/targets.nix // { _ = "*"; };
   renamesList = import ./manifests/renames.nix;
   profilesList = import ./manifests/profiles.nix;
+
+  inherit (final.rust-bin) distRoot;
 
   # Extensions for mixed `rust` pkg.
   components = [
@@ -109,7 +110,16 @@ let
   in ret // { latest = ret.${set.latest}; };
 
 in {
-  stable  = uncompressManifestSet "stable"  (import ./manifests/stable);
-  beta    = uncompressManifestSet "beta"    (import ./manifests/beta);
-  nightly = uncompressManifestSet "nightly" (import ./manifests/nightly);
+  rust-bin = (prev.rust-bin or {}) // {
+    # The dist url for fetching.
+    # Override it if you want to use a mirror server.
+    distRoot = "https://static.rust-lang.org/dist";
+
+    # For internal usage.
+    manifests = {
+      stable  = uncompressManifestSet "stable"  (import ./manifests/stable);
+      beta    = uncompressManifestSet "beta"    (import ./manifests/beta);
+      nightly = uncompressManifestSet "nightly" (import ./manifests/nightly);
+    };
+  };
 }

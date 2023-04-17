@@ -1,10 +1,10 @@
-# Component resolution, aggregation and other utility functions.
-{ lib, pkgs, rust-bin }:
+# Define component resolution and utility functions.
+self: super:
 
 let
   inherit (builtins) compareVersions fromTOML match readFile tryEval;
 
-  inherit (lib)
+  inherit (self.lib)
     any attrNames attrValues concatStringsSep elem elemAt filter flatten foldl'
     hasPrefix head isString length listToAttrs makeOverridable mapAttrs
     mapAttrsToList optional optionalAttrs replaceStrings substring trace unique;
@@ -20,22 +20,22 @@ let
     if platform.isWasi then
       "${platform.parsed.cpu.name}-wasi"
     else
-      pkgs.rust.toRustTarget platform;
+      self.rust.toRustTarget platform;
 
   # The platform where `rustc` is running.
-  rustHostPlatform = toRustTarget pkgs.stdenv.hostPlatform;
+  rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
   # The platform of binary which `rustc` produces.
-  rustTargetPlatform = toRustTarget pkgs.stdenv.targetPlatform;
+  rustTargetPlatform = toRustTarget self.stdenv.targetPlatform;
 
-  mkComponentSet = pkgs.callPackage ./mk-component-set.nix {
+  mkComponentSet = self.callPackage ./mk-component-set.nix {
     inherit toRustTarget removeNulls;
   };
 
-  mkAggregated = pkgs.callPackage ./mk-aggregated.nix {};
+  mkAggregated = self.callPackage ./mk-aggregated.nix {};
 
   # Manifest selector.
   selectManifest = { channel, date ? null }: let
-    inherit (rust-bin) manifests;
+    inherit (self.rust-bin) manifests;
 
     assertWith = cond: msg: body: if cond then body else throw msg;
 
@@ -127,7 +127,7 @@ let
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-      pkgs.fetchurl { inherit name sha256; url = url'; };
+      self.fetchurl { inherit name sha256; url = url'; };
 
   # Resolve final components to install from mozilla-overlay style `extensions`, `targets` and `targetExtensions`.
   #
@@ -252,6 +252,8 @@ let
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
   toolchainFromManifest = manifest: let
+    maybeRename = name: manifest.renames.${name}.to or name;
+
     # platform -> true
     # For fail-fast test.
     allPlatformSet =
@@ -368,7 +370,7 @@ let
     target ? rustTargetPlatform
   }: let
     hashToSrc = compName: hash:
-      pkgs.fetchurl {
+      self.fetchurl {
         url = if compName == "rust-src"
           then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly.tar.xz"
           else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
@@ -392,10 +394,10 @@ let
   # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = ["llvm-tools-preview"]; })`
   selectLatestNightlyWith = selector:
     let
-      nightlyDates = attrNames (removeAttrs rust-bin.nightly [ "latest" ]);
+      nightlyDates = attrNames (removeAttrs self.rust-bin.nightly [ "latest" ]);
       dateLength = length nightlyDates;
       go = idx:
-        let ret = selector (rust-bin.nightly.${elemAt nightlyDates idx}); in
+        let ret = selector (self.rust-bin.nightly.${elemAt nightlyDates idx}); in
         if idx == 0 then
           ret
         else if dateLength - idx >= 256 then
@@ -408,14 +410,66 @@ let
       go (length nightlyDates - 1);
 
 in {
-  inherit
-    fromRustcRev
-    fromRustupToolchain
-    fromRustupToolchainFile
-    overrideToolchain
-    selectLatestNightlyWith
-    selectManifest
-    toolchainFromManifest
-    toolchainFromManifestFile
-    ;
+  # For each channel:
+  #   rust-bin.stable.latest.{minimal,default,complete} # Profiles.
+  #   rust-bin.stable.latest.rust   # Pre-aggregate from upstream.
+  #   rust-bin.stable.latest.cargo  # Components...
+  #   rust-bin.stable.latest.rustc
+  #   rust-bin.stable.latest.rust-docs
+  #   ...
+  #
+  # For a specific version of stable:
+  #   rust-bin.stable."1.47.0".default
+  #
+  # For a specific date of beta:
+  #   rust-bin.beta."2021-01-01".default
+  #
+  # For a specific date of nightly:
+  #   rust-bin.nightly."2020-01-01".default
+  rust-bin =
+    (super.rust-bin or {}) //
+    mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) super.rust-bin.manifests //
+    {
+      inherit fromRustupToolchain fromRustupToolchainFile;
+      inherit selectLatestNightlyWith;
+      inherit fromRustcRev;
+    };
+
+  # All attributes below are for compatiblity with mozilla overlay.
+
+  lib = (super.lib or {}) // {
+    rustLib = (super.lib.rustLib or {}) // {
+      manifest_v2_url = throw ''
+        `manifest_v2_url` is not supported.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '';
+      fromManifest = throw ''
+        `fromManifest` is not supported due to network access during evaluation.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '';
+      fromManifestFile = manifestFilePath: { stdenv, fetchurl, patchelf }@deps: trace ''
+        `fromManifestFile` is deprecated.
+        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+        See also README at https://github.com/oxalica/rust-overlay
+      '' (overrideToolchain deps (toolchainFromManifestFile manifestFilePath));
+    };
+  };
+
+  rustChannelOf = manifestArgs: toolchainFromManifest (selectManifest manifestArgs);
+
+  latest = (super.latest or {}) // {
+    rustChannels = {
+      stable = self.rust-bin.stable.latest;
+      beta = self.rust-bin.beta.latest;
+      nightly = self.rust-bin.nightly.latest;
+    };
+  };
+
+  rustChannelOfTargets = channel: date: targets:
+    (self.rustChannelOf { inherit channel date; })
+      .rust.override { inherit targets; };
+
+  rustChannels = self.latest.rustChannels;
 }
