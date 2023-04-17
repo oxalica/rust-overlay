@@ -5,11 +5,15 @@
   '';
 
   inputs = {
+    # See: https://github.com/nix-systems/nix-systems
+    systems.url = "path:./systems.nix";
+    systems.flake = false;
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     flake-utils.url = "github:numtide/flake-utils";
+    flake-utils.inputs.systems.follows = "systems";
   };
 
-  outputs = { self, nixpkgs, flake-utils }: let
+  outputs = { self, systems, nixpkgs, flake-utils }: let
     inherit (nixpkgs.lib)
       elem filterAttrs head mapAttrs mapAttrs' optionalAttrs replaceStrings warnIf;
 
@@ -18,20 +22,7 @@
 
     overlay = import ./.;
 
-    allSystems = [
-      "aarch64-darwin"
-      "aarch64-linux"
-      "armv5tel-linux"
-      "armv6l-linux"
-      "armv7a-linux"
-      "armv7l-linux"
-      "i686-linux"
-      # "mipsel-linux" # Missing `busybox`.
-      "powerpc64le-linux"
-      "riscv64-linux"
-      "x86_64-darwin"
-      "x86_64-linux"
-    ];
+    allSystems = import systems;
 
   in {
     overlays = {
