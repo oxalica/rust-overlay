@@ -26,7 +26,7 @@
       "flake": false,
       "locked": {
         "lastModified": 1,
-        "narHash": "sha256-zz/zMtmE95DrZPZ+eXAOHkD6pW4M4MaozQyIhYvP5xw=",
+        "narHash": "sha256-cyfZqnwhPNzdfQnmUUUVK5fon88TSm/0CwgE7Lf+LDU=",
         "path": "./systems.nix",
         "type": "path"
       },
