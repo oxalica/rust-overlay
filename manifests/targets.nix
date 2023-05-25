@@ -102,4 +102,5 @@
   _100 = "x86_64-unknown-uefi";
   _101 = "aarch64-unknown-fuchsia";
   _102 = "x86_64-unknown-fuchsia";
+  _103 = "loongarch64-unknown-linux-gnu";
 }
