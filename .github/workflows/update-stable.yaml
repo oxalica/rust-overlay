@@ -17,6 +17,9 @@ on:
     types:
       - completed
 
+permissions:
+  contents: write
+
 jobs:
   update-stable:
     name: Update "stable" branch
