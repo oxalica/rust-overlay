@@ -28,7 +28,7 @@ You can put the code below into your `~/.config/nixpkgs/overlays.nix`.
 ```
 Then the provided attribute paths are available in nix command.
 ```bash
-$ nix-env -iA rust-bin.stable.latest.default # Do anything you like.
+$ nix-env -iA nixpkgs.rust-bin.stable.latest.default # `nixpkgs` (or `nixos`) is your nixpkgs channel name.
 ```
 
 Alternatively, you can install it into nix channels.
