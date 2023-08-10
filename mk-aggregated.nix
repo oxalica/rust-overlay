@@ -58,6 +58,11 @@ symlinkJoin {
     for file in $out/lib/librustc_driver*; do
       cp --remove-destination "$(realpath -e $file)" $file
     done
+
+    # installed with rustc-dev
+    for file in $out/lib/rustlib/*/lib/librustc_driver*; do
+      cp --remove-destination "$(realpath -e $file)" $file
+    done
   ''
   + ''
     if [ -e $out/bin/cargo-miri ]; then
