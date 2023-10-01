@@ -104,4 +104,6 @@
   _102 = "x86_64-unknown-fuchsia";
   _103 = "loongarch64-unknown-linux-gnu";
   _104 = "wasm32-wasi-preview1-threads";
+  _105 = "loongarch64-unknown-none";
+  _106 = "loongarch64-unknown-none-softfloat";
 }
