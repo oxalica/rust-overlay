@@ -112,13 +112,13 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
           buildInputs = [
             openssl
             pkg-config
-            exa
+            eza
             fd
             rust-bin.beta.latest.default
           ];
 
           shellHook = ''
-            alias ls=exa
+            alias ls=eza
             alias find=fd
           '';
         };
