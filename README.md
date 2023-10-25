@@ -183,6 +183,15 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
   })
   ```
 
+- Override the root URL for downloading static resources.
+
+  ```nix
+  ((rust-bin // { distRoot = "${builtins.getEnv "RUSTUP_DIST_SERVER"}/dist"; }).nightly.latest.default.override {
+    targets = [ "x86_64-unknown-linux-gnu" "wasm32-unknown-unknown" ];
+    extensions = [ "rust-analyzer" "rust-src" "rust-std" ];
+  })
+  ```
+
 - A specific version of rust:
   ```nix
   rust-bin.stable."1.48.0".default
