@@ -17,7 +17,14 @@ let
 
   mkComponent = pname: src: let
     # These components link to `librustc_driver*.so` or `libLLVM*.so`.
-    linksToRustc = elem pname [ "clippy-preview" "rls-preview" "miri-preview" "rustc-dev" "rustfmt-preview" ];
+    linksToRustc = elem pname [
+      "clippy-preview"
+      "miri-preview"
+      "rls-preview"
+      "rustc-codegen-cranelift-preview"
+      "rustc-dev"
+      "rustfmt-preview"
+    ];
   in
     stdenvNoCC.mkDerivation rec {
       inherit pname version src;
