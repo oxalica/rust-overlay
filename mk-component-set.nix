@@ -21,6 +21,7 @@ let
       "clippy-preview"
       "miri-preview"
       "rls-preview"
+      "rust-analyzer-preview"
       "rustc-codegen-cranelift-preview"
       "rustc-dev"
       "rustfmt-preview"
