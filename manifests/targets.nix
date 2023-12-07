@@ -106,4 +106,5 @@
   _104 = "wasm32-wasi-preview1-threads";
   _105 = "loongarch64-unknown-none";
   _106 = "loongarch64-unknown-none-softfloat";
+  _107 = "riscv32imafc-unknown-none-elf";
 }
