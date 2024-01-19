@@ -1,4 +1,4 @@
-{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash }:
+{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl }:
 { pname, version, date, selectedComponents, availableComponents ? selectedComponents }:
 let
   inherit (lib) optional;
@@ -54,6 +54,14 @@ symlinkJoin {
         ''}
       fi
     done
+    ${lib.optionalString stdenv.isDarwin ''
+      cargo="$out/bin/cargo"
+      if [ -e "$cargo" ]; then
+        cp --remove-destination "$(realpath -e $cargo)" "$cargo"
+        chmod +w "$cargo"
+        install_name_tool -change "/usr/lib/libcurl.4.dylib" "${curl.out}/lib/libcurl.4.dylib" "$cargo"
+      fi
+    ''}
     shopt nullglob
     for file in $out/lib/librustc_driver*; do
       cp --remove-destination "$(realpath -e $file)" $file
