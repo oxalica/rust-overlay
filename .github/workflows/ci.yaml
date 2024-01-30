@@ -24,10 +24,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v22
+      uses: cachix/install-nix-action@v25
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
@@ -99,10 +99,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v22
+      uses: cachix/install-nix-action@v25
       with:
         nix_path: nixpkgs=channel:${{ matrix.nixpkgs-channel }}
         install_url: ${{ matrix.nix_install_url }}
@@ -147,10 +147,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v22
+      uses: cachix/install-nix-action@v25
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
