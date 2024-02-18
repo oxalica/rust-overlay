@@ -20,7 +20,7 @@ let
     if platform.isWasi then
       "${platform.parsed.cpu.name}-wasi"
     else
-      self.rust.toRustTarget platform;
+      platform.rust.rustcTarget or (super.rust.toRustTarget platform);
 
   # The platform where `rustc` is running.
   rustHostPlatform = toRustTarget self.stdenv.hostPlatform;
