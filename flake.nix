@@ -56,27 +56,34 @@
     # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
 
     packages = let
-      select = version: comps: if version == "latest" then null else comps.default or null;
+      select = version: comps:
+        if comps ? default then
+          comps.default // {
+            minimal = comps.minimal or (throw "missing profile 'minimal' for ${version}");
+          }
+        else
+          null;
       result =
         mapAttrs' (version: comps: {
-          name = "rust_${replaceStrings ["."] ["_"] version}";
+          name = if version == "latest"
+            then "rust"
+            else "rust_${replaceStrings ["."] ["_"] version}";
           value = select version comps;
         }) pkgs.rust-bin.stable //
         mapAttrs' (version: comps: {
-          name = "rust-nightly_${version}";
+          name = if version == "latest"
+            then "rust-nightly"
+            else "rust-nightly_${version}";
           value = select version comps;
         }) pkgs.rust-bin.nightly //
         mapAttrs' (version: comps: {
-          name = "rust-beta_${version}";
+          name = if version == "latest"
+            then "rust-beta"
+            else "rust-beta_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.beta //
-        rec {
-          rust = pkgs.rust-bin.stable.latest.default;
-          rust-beta = pkgs.rust-bin.beta.latest.default;
-          rust-nightly = pkgs.rust-bin.nightly.latest.default;
-          default = rust;
-        };
-    in filterAttrs (name: drv: drv != null) result;
+        }) pkgs.rust-bin.beta;
+        result' = filterAttrs (name: drv: drv != null) result;
+    in result' // { default = result'.rust; };
 
     checks = let
       inherit (pkgs) rust-bin rustChannelOf;
