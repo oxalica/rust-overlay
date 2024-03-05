@@ -107,4 +107,8 @@
   _105 = "loongarch64-unknown-none";
   _106 = "loongarch64-unknown-none-softfloat";
   _107 = "riscv32imafc-unknown-none-elf";
+  _108 = "aarch64-unknown-linux-ohos";
+  _109 = "armv7-unknown-linux-ohos";
+  _110 = "wasm32-wasip1";
+  _111 = "x86_64-unknown-linux-ohos";
 }
