@@ -111,4 +111,5 @@
   _109 = "armv7-unknown-linux-ohos";
   _110 = "wasm32-wasip1";
   _111 = "x86_64-unknown-linux-ohos";
+  _112 = "wasm32-wasip1-threads";
 }
