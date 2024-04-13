@@ -106,9 +106,8 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
           inherit system overlays;
         };
       in
-      with pkgs;
       {
-        devShells.default = mkShell {
+        devShells.default = with pkgs; mkShell {
           buildInputs = [
             openssl
             pkg-config
