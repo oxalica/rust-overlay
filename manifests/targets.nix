@@ -112,4 +112,5 @@
   _110 = "wasm32-wasip1";
   _111 = "x86_64-unknown-linux-ohos";
   _112 = "wasm32-wasip1-threads";
+  _113 = "riscv32im-unknown-none-elf";
 }
