@@ -113,4 +113,7 @@
   _111 = "x86_64-unknown-linux-ohos";
   _112 = "wasm32-wasip1-threads";
   _113 = "riscv32im-unknown-none-elf";
+  _114 = "aarch64-pc-windows-gnullvm";
+  _115 = "i686-pc-windows-gnullvm";
+  _116 = "x86_64-pc-windows-gnullvm";
 }
