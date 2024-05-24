@@ -27,7 +27,7 @@ symlinkJoin {
 
   # Link dependency for target, required by darwin std.
   depsTargetTargetPropagated =
-    optional (targetPlatform.isDarwin) [ pkgsTargetTarget.libiconv ];
+    optional (targetPlatform.isDarwin) pkgsTargetTarget.libiconv;
 
   # If rustc or rustdoc is in the derivation, we need to copy their
   # executable into the final derivation. This is required
