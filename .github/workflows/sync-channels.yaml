@@ -4,7 +4,7 @@ on:
     # The nightly channel is usually updated at 01:00:00 UTC.
     - cron: '0 2 * * *' # *-*-* 02:00:00 UTC
     # The stable channel is usually updated before 17:00:00 UTC
-    - cron: '0 17 * * *' # *-*-* 17:00:00 UTC
+    - cron: '0 17 * * THU' # *-*-* 17:00:00 UTC
 
   workflow_dispatch:
 
