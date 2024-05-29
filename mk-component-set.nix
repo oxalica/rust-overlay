@@ -1,5 +1,7 @@
 # Define component derivations and special treatments.
 { lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs
+# The path to nixpkgs root.
+, path
 , toRustTarget, removeNulls
 }:
 # Release version of the whole set.
@@ -105,7 +107,43 @@ let
         for f in $out/bin/*; do
           install_name_tool -add_rpath "${self.rustc}/lib" "$f" || true
         done
+      ''
+      # Wrap the shipped `rust-lld` (lld), which is used by default on some targets.
+      # Unfortunately there is no hook to conveniently wrap CC tools inside
+      # derivation and `wrapBintools` is designed for wrapping a standalone
+      # bintools derivation. We hereby copy minimal of their implementation.
+      # The `wrap()` is from:
+      # https://github.com/NixOS/nixpkgs/blob/bfb7a882678e518398ce9a31a881538679f6f092/pkgs/build-support/bintools-wrapper/default.nix#L178
+      + optionalString (pname == "rustc") ''
+        wrap() {
+          local dst="$1"
+          local wrapper="$2"
+          export prog="$3"
+          export use_response_file_by_default=0
+          substituteAll "$wrapper" "$dst"
+          chmod +x "$dst"
+        }
+
+        dsts=( "$out"/lib/rustlib/*/bin/rust-lld )
+        if [[ ''${#dsts} -ne 0 ]]; then
+          ls -lah $out
+          mkdir -p $out/nix-support
+          substituteAll ${path + "/pkgs/build-support/wrapper-common/utils.bash"} $out/nix-support/utils.bash
+          substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-flags.sh"} $out/nix-support/add-flags.sh
+          substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-hardening.sh"} $out/nix-support/add-hardening.sh
+
+          for dst in "''${dsts[@]}"; do
+            unwrapped="$(dirname "$dst")/.rust-lld-unwrapped"
+            mv "$dst" "$unwrapped"
+            wrap "$dst" ${./ld-wrapper.sh} "$unwrapped"
+          done
+        fi
       '';
+
+      env = lib.optionalAttrs (pname == "rustc") {
+        inherit (stdenv.cc.bintools) expandResponseParams shell suffixSalt wrapperName coreutils_bin;
+        hardening_unsupported_flags = "";
+      };
 
       dontStrip = true;
     };
