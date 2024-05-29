@@ -84,7 +84,7 @@ symlinkJoin {
     fi
 
     # symlinkJoin doesn't automatically handle it. Thus do it manually.
-    mkdir $out/nix-support
+    mkdir -p $out/nix-support
     echo "$depsHostHostPropagated " >$out/nix-support/propagated-host-host-deps
     [[ -z "$propagatedBuildInputs" ]] || echo "$propagatedBuildInputs " >$out/nix-support/propagated-build-inputs
     [[ -z "$depsTargetTargetPropagated" ]] || echo "$depsTargetTargetPropagated " >$out/nix-support/propagated-target-target-deps
