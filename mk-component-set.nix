@@ -124,18 +124,19 @@ let
           chmod +x "$dst"
         }
 
-        dsts=( "$out"/lib/rustlib/*/bin/rust-lld )
+        dsts=( "$out"/lib/rustlib/*/bin/gcc-ld/ld.lld )
         if [[ ''${#dsts} -ne 0 ]]; then
-          ls -lah $out
           mkdir -p $out/nix-support
           substituteAll ${path + "/pkgs/build-support/wrapper-common/utils.bash"} $out/nix-support/utils.bash
           substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-flags.sh"} $out/nix-support/add-flags.sh
           substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-hardening.sh"} $out/nix-support/add-hardening.sh
 
           for dst in "''${dsts[@]}"; do
-            unwrapped="$(dirname "$dst")/.rust-lld-unwrapped"
+            # The ld.lld is path/name sensitive because itself is a wrapper. Keep its original name.
+            unwrapped="$(dirname "$dst")-unwrapped/ld.lld"
+            mkdir -p "$(dirname "$unwrapped")"
             mv "$dst" "$unwrapped"
-            wrap "$dst" ${./ld-wrapper.sh} "$unwrapped"
+            wrap "$dst" ${path + "/pkgs/build-support/bintools-wrapper/ld-wrapper.sh"} "$unwrapped"
           done
         fi
       '';
