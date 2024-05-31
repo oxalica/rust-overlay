@@ -10,8 +10,17 @@ Hashes of toolchain components are pre-fetched in tree, so the evaluation is *pu
 no need to have network access. It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
 
 - The toolchain hashes are auto-updated daily using GitHub Actions.
-- Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
-  (which are randomly picked and may change over time).
+
+- Current oldest supported stable version is 1.29.0 which are randomly picked.
+
+  Stable versions will not be purged currently.
+
+- Current oldest supported nightly version is 2023-01-01.
+
+  To prevent significant repository size bloating, our current strategy is keep
+  only nightly and beta versions not earlier than `{current_year - 1}-01-01`.
+  Earlier versions may be accessed via
+  [old snapshot tags](https://github.com/oxalica/rust-overlay/tags).
 
 rust-overlay targets nixos-unstable and supported releases of NixOS, on x86_64-linux.
 They are tested on CI. It may also work on other channels but is not guarenteed.
