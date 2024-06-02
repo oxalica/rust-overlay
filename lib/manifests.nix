@@ -5,9 +5,9 @@ let
   inherit (final.lib)
     attrNames concatMap elemAt filter hasAttr mapAttrs mapAttrs' removeSuffix;
 
-  targets = import ./manifests/targets.nix // { _ = "*"; };
-  renamesList = import ./manifests/renames.nix;
-  profilesList = import ./manifests/profiles.nix;
+  targets = import ../manifests/targets.nix // { _ = "*"; };
+  renamesList = import ../manifests/renames.nix;
+  profilesList = import ../manifests/profiles.nix;
 
   inherit (final.rust-bin) distRoot;
 
@@ -117,9 +117,9 @@ in {
 
     # For internal usage.
     manifests = {
-      stable  = uncompressManifestSet "stable"  (import ./manifests/stable);
-      beta    = uncompressManifestSet "beta"    (import ./manifests/beta);
-      nightly = uncompressManifestSet "nightly" (import ./manifests/nightly);
+      stable  = uncompressManifestSet "stable"  (import ../manifests/stable);
+      beta    = uncompressManifestSet "beta"    (import ../manifests/beta);
+      nightly = uncompressManifestSet "nightly" (import ../manifests/nightly);
     };
   };
 }
