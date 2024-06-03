@@ -47,7 +47,9 @@ symlinkJoin {
         [[ $file != */*clippy* ]] || cp --remove-destination "$(realpath -e $file)" $file
         chmod +w $file
         ${lib.optionalString stdenv.isLinux ''
-          patchelf --set-rpath $out/lib "$file" || true
+          if prev_rpath="$(patchelf --print-rpath "$file")"; then
+            patchelf --set-rpath "$out/lib''${prev_rpath:+:}$prev_rpath" "$file"
+          fi
         ''}
         ${lib.optionalString stdenv.isDarwin ''
           install_name_tool -add_rpath $out/lib "$file" || true
