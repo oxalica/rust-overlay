@@ -42,7 +42,7 @@ mkShell {
   # See: https://github.com/NixOS/nixpkgs/pull/146583
   depsBuildBuild = [ qemu ];
 
-  # Run-time dependencies. build = your-matchine, host = target = aarch64
+  # Run-time dependencies. build = your-machine, host = target = aarch64
   # Usually are libraries to be linked.
   buildInputs = [ openssl ];
 

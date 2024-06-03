@@ -78,7 +78,7 @@ We provides two entry interfaces:
       # but less than `complete` profile.
       rust = «derivation»;
 
-      # Individial components.
+      # Individual components.
       rustc = «derivation»;
       cargo = «derivation»;
       rust-std = «derivation»;

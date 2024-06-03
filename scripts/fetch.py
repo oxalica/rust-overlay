@@ -290,7 +290,7 @@ def sync_stable_channel(*, stop_if_exists, max_update=None):
     update_stable_index()
 
 def sync_beta_channel(*, stop_if_exists, max_update=None):
-    # Fetch the global nightly manifest to retrive the latest nightly version.
+    # Fetch the global nightly manifest to retrieve the latest nightly version.
     print('Fetching latest beta version')
     manifest = fetch_url(f'{DIST_ROOT}/channel-rust-beta.toml').text
     date = datetime.date.fromisoformat(toml.loads(manifest)['date'])
@@ -313,7 +313,7 @@ def sync_beta_channel(*, stop_if_exists, max_update=None):
     update_beta_index()
 
 def sync_nightly_channel(*, stop_if_exists, max_update=None):
-    # Fetch the global nightly manifest to retrive the latest nightly version.
+    # Fetch the global nightly manifest to retrieve the latest nightly version.
     print('Fetching latest nightly version')
     manifest = fetch_url(f'{DIST_ROOT}/channel-rust-nightly.toml').text
     date = datetime.date.fromisoformat(toml.loads(manifest)['date'])

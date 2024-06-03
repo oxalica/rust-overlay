@@ -228,7 +228,7 @@ let
         ${concatStringsSep "\n" (errors ++ notes)}
       '';
 
-  # Genereate the toolchain set from a parsed manifest.
+  # Generate the toolchain set from a parsed manifest.
   #
   # Manifest files are organized as follow:
   # { date = "2017-03-03";
