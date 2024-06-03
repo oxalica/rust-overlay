@@ -10,10 +10,9 @@
   };
 
   outputs = { self, nixpkgs, flake-utils }: let
-    inherit (nixpkgs.lib)
+    inherit (nixpkgs) lib;
+    inherit (lib)
       elem filterAttrs head mapAttrs' optionalAttrs replaceStrings;
-
-    overlay = import ./.;
 
     allSystems = [
       "aarch64-darwin"
@@ -30,13 +29,43 @@
       "x86_64-linux"
     ];
 
+    overlay = import ./.;
+
+    defaultDistRoot = import ./lib/dist-root.nix;
+    mkManifests = distRoot: import ./lib/manifests.nix { inherit lib distRoot; };
+
+    # Builder to construct `rust-bin` interface on an existing `pkgs`.
+    # This would be immutable, non-intrusive and (hopefully) can benefit from
+    # flake eval-cache.
+    #
+    # Note that this does not contain compatible attrs for mozilla-overlay.
+    mkRustBin =
+      { distRoot ? defaultDistRoot }:
+      pkgs:
+      lib.fix (rust-bin: import ./lib/rust-bin.nix {
+        inherit lib pkgs;
+        inherit (pkgs.rust) toRustTarget;
+        inherit (rust-bin) nightly;
+        manifests = mkManifests distRoot;
+      });
+
   in {
+    lib = {
+      # Internal use only!
+      _internal = {
+        defaultManifests = mkManifests defaultDistRoot;
+      };
+
+      inherit mkRustBin;
+    };
+
     overlays = {
       default = overlay;
       rust-overlay = overlay;
     };
   } // flake-utils.lib.eachSystem allSystems (system: let
-    pkgs = import nixpkgs { inherit system; overlays = [ overlay ]; };
+    pkgs = nixpkgs.legacyPackages.${system};
+    rust-bin = mkRustBin {} pkgs;
   in {
     # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
 
@@ -54,25 +83,27 @@
             then "rust"
             else "rust_${replaceStrings ["."] ["_"] version}";
           value = select version comps;
-        }) pkgs.rust-bin.stable //
+        }) rust-bin.stable //
         mapAttrs' (version: comps: {
           name = if version == "latest"
             then "rust-nightly"
             else "rust-nightly_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.nightly //
+        }) rust-bin.nightly //
         mapAttrs' (version: comps: {
           name = if version == "latest"
             then "rust-beta"
             else "rust-beta_${version}";
           value = select version comps;
-        }) pkgs.rust-bin.beta;
+        }) rust-bin.beta;
         result' = filterAttrs (name: drv: drv != null) result;
     in result' // { default = result'.rust; };
 
     checks = let
-      inherit (pkgs) rust-bin rustChannelOf;
-      inherit (pkgs.rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
+      inherit (rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
+
+      pkgs-compat = import nixpkgs { inherit system; overlays = [ overlay ]; };
+      inherit (pkgs-compat) latest rustChannelOf;
 
       rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
@@ -100,9 +131,9 @@
         rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
         rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
 
-        latest-stable-legacy = assertEq pkgs.latest.rustChannels.stable.rustc stable.latest.rustc;
-        latest-beta-legacy = assertEq pkgs.latest.rustChannels.beta.rustc beta.latest.rustc;
-        latest-nightly-legacy = assertEq pkgs.latest.rustChannels.nightly.rustc nightly.latest.rustc;
+        latest-stable-legacy = assertEq latest.rustChannels.stable.rustc stable.latest.rustc;
+        latest-beta-legacy = assertEq latest.rustChannels.beta.rustc beta.latest.rustc;
+        latest-nightly-legacy = assertEq latest.rustChannels.nightly.rustc nightly.latest.rustc;
 
         rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rustc stable.latest.rustc;
         rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rustc beta.latest.rustc;

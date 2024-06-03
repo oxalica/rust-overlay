@@ -24,7 +24,7 @@ let
 in {
   rust-bin = (prev.rust-bin or { }) // {
     # The overridable dist url for fetching.
-    distRoot = "https://static.rust-lang.org/dist";
+    distRoot = import ./lib/dist-root.nix;
   } // import ./lib/rust-bin.nix {
     inherit lib manifests;
     inherit (final.rust) toRustTarget;
