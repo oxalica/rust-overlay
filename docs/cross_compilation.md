@@ -1,5 +1,7 @@
 # Cross compilation with `rust-overlay`
 
+## `shell.nix` and `nix shell` development environment
+
 There are examples for cross compilation in [`example` directory](../examples).
 To try examples,
 1. `cd` into `example/cross-aarch64` (or other directory).
@@ -57,4 +59,34 @@ mkShell {
 ```
 
 For more details about these different kinds of dependencies,
-see also [Nix Wiki - Cross Compiling](https://nixos.wiki/wiki/Cross_Compiling#How_to_specify_dependencies).
+see also [Nix Wiki - Cross Compiling][wiki-cross]
+
+## Flakes and `nix develop` development environment
+
+Unfortunately flake output layout does not natively support cross-compilation
+(see [NixOS/nix#5157][flake-cross-issue]). We provide `mkRustBin` to allow
+construction of `rust-bin` on an existing nixpkgs to leverage flake benefits of
+not-importing nixpkgs again, with the cost of re-instantiating `rust-bin` for
+each host-target tuples.
+
+Pass the spliced packages for your cross-compilation target to `mkRustBin` to
+get corresponding compiler toolchains for them.
+
+```nix
+let
+  pkgs = nixpkgs.legacyPackages.x86_64-linux.pkgsCross.aarch64-multiplatform;
+  rust-bin = rust-overlay.lib.mkRustBin { } pkgs.buildPackages;
+in pkgs.mkShell {
+  nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
+}
+```
+
+The full example can be seen in
+[`examples/cross-aarch64/flake.nix`](../examples/cross-aarch64/flake.nix).
+To try it,
+1. `cd` into `example/cross-aarch64`.
+2. `nix develop` to enter the development environment.
+3. `make run` to build and run the program in an emulator.
+
+[wiki-cross]: https://wiki.nixos.org/wiki/Cross_Compiling#How_to_specify_dependencies
+[flake-cross-issue]: https://github.com/NixOS/nix/issues/5157

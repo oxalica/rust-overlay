@@ -1,3 +1,4 @@
+# Example flake for `nix shell`.
 # See docs/cross_compilation.md for details.
 (import <nixpkgs> {
   crossSystem = "aarch64-linux";

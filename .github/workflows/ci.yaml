@@ -138,12 +138,16 @@ jobs:
         [[ "$(< out)" == *"warning: this loop never actually loops"* ]]
 
   test-cross-examples:
-    name: Test cross compilation examples
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         example: [cross-aarch64, cross-wasi, cross-mingw]
+        kind: [shell]
+        include:
+          - example: cross-aarch64
+            kind: flake
+    name: Test cross compilation examples (${{ matrix.kind }})
 
     steps:
     - name: Checkout
@@ -158,15 +162,23 @@ jobs:
     - name: Don't let ~/.cargo/bin mess things up
       run: rm -rf ~/.cargo/bin
 
-    - name: Prepare nix-shell
+    - name: Prepare dev env
       run: |
         cd examples/${{ matrix.example }}
-        nix-shell --pure --command true
+        if [[ ${{ matrix.kind }} == 'shell' ]]; then
+          nix-shell --pure --command true
+        else
+          nix develop --ignore-environment --override-input rust-overlay ../..
+        fi
 
     - name: Build and run example
       run: |
         cd examples/${{ matrix.example }}
         set -o pipefail
-        # No --pure since it requires CA cert access for crates downloading.
-        nix-shell --command "make run" | tee out
+        if [[ ${{ matrix.kind }} == 'shell' ]]; then
+          # No --pure since it requires CA cert access for crates downloading.
+          nix-shell --pure --command "make run" | tee out
+        else
+          nix develop --ignore-environment --override-input rust-overlay ../.. --command make run | tee out
+        fi
         [[ "$(< out)" == *"Hello, world!"* ]]
