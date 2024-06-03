@@ -3,20 +3,32 @@
 [![CI status](https://github.com/oxalica/rust-overlay/workflows/CI/badge.svg)](https://github.com/oxalica/rust-overlay/actions/workflows/ci.yaml)
 [![sync-channels status](https://github.com/oxalica/rust-overlay/workflows/sync-channels/badge.svg)](https://github.com/oxalica/rust-overlay/actions/workflows/sync-channels.yaml)
 
-*Pure and reproducible* overlay for binary distributed rust toolchains.
-A compatible but better replacement for rust overlay of [nixpkgs-mozilla].
+*Pure and reproducible* packaging of binary distributed rust toolchains.
+A compatible but better replacement for rust overlay of [nixpkgs-mozilla],
+with also non-overlay and [Nix Flake][flake] interfaces (despite the project name).
 
-Hashes of toolchain components are pre-fetched in tree, so the evaluation is *pure* and
-no need to have network access. It also works well with [Nix Flakes](https://nixos.wiki/wiki/Flakes).
+[flake]: https://wiki.nixos.org/wiki/Flakes
 
-- The toolchain hashes are auto-updated daily using GitHub Actions.
+For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
+
+Features:
+
+- Hashes of toolchain components are pre-fetched in tree, so the evaluation is
+  *pure* and no need to have network access.
+
+- These hashes are auto-updated daily using GitHub Actions.
+
 - Current oldest supported version is stable 1.29.0 and beta/nightly 2018-09-13
   (which are randomly picked and may change over time).
 
-rust-overlay targets nixos-unstable and supported releases of NixOS, on x86_64-linux.
-They are tested on CI. It may also work on other channels but is not guarenteed.
+- We targets nixos-unstable and supported releases of NixOS, on x86\_64-linux.
+  They are tested on CI. Other platforms and nixpkgs channels may also work but
+  is not guaranteed.
 
-For migration from [nixpkgs-mozilla], see [this section](#migration-from-nixpkgs-mozilla).
+Documentations:
+
+- [API References](docs/reference.md)
+- [Cross compilation](docs/cross_compilation.md)
 
 ## Installation
 
@@ -40,8 +52,6 @@ And then feel free to use it anywhere like
 `import <nixpkgs> { overlays = [ (import <rust-overlay>) ]; }` in your nix shell environment.
 
 ### Nix Flakes
-
-This repository already has flake support.
 
 **Warning: Only the output `overlay`/`overlays` are currently stable. Use other outputs at your own risk!**
 
@@ -217,11 +227,6 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
   *Warning: This may not always work (including the example below) since upstream CI periodically purges old artifacts.*
 
 - There also an cross-compilation example in [`examples/cross-aarch64`].
-
-## More documentations
-
-- [Reference of all public attributes](docs/reference.md)
-- [Cross compilation](docs/cross_compilation.md)
 
 ## License
 
