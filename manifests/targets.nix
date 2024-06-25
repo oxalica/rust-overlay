@@ -117,4 +117,5 @@
   _115 = "i686-pc-windows-gnullvm";
   _116 = "x86_64-pc-windows-gnullvm";
   _117 = "arm64ec-pc-windows-msvc";
+  _118 = "loongarch64-unknown-linux-musl";
 }
