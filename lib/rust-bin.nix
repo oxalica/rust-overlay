@@ -338,26 +338,31 @@ let
   #                       All extensions in this list will be installed for the target architectures.
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
-  toolchainFromManifest = manifest: let
-    # platform -> true
-    # For fail-fast test.
-    allPlatformSet =
-      listToAttrs (
+  toolchainFromManifest =
+    manifest:
+    let
+      # platform -> true
+      # For fail-fast test.
+      allPlatformSet = listToAttrs (
         flatten (
-          mapAttrsToList (compName: { target, ... }:
-            map (platform: { name = platform; value = true; })
-              (attrNames target)
-          ) manifest.pkg));
+          mapAttrsToList (
+            compName:
+            { target, ... }:
+            map (platform: {
+              name = platform;
+              value = true;
+            }) (attrNames target)
+          ) manifest.pkg
+        )
+      );
 
-    # componentName -> true
-    # May also contains unavailable components. Just for fail-fast test.
-    allComponentSet =
-      mapAttrs (compName: _: true)
-        (manifest.pkg // manifest.renames);
+      # componentName -> true
+      # May also contains unavailable components. Just for fail-fast test.
+      allComponentSet = mapAttrs (compName: _: true) (manifest.pkg // manifest.renames);
 
-    # componentSet.x86_64-unknown-linux-gnu.cargo = <derivation>;
-    componentSet =
-      mapAttrs (platform: _:
+      # componentSet.x86_64-unknown-linux-gnu.cargo = <derivation>;
+      componentSet = mapAttrs (
+        platform: _:
         mkComponentSet {
           inherit (manifest) version renames;
           inherit platform;
@@ -380,53 +385,73 @@ let
         }
       ) allPlatformSet;
 
-    mkProfile = name: profileComponents:
-      makeOverridable ({ extensions, targets, targetExtensions }:
-        mkAggregated {
-          pname = "rust-${name}";
-          inherit (manifest) version date;
-          availableComponents = componentSet.${rustHostPlatform};
-          selectedComponents = resolveComponents {
-            name = "rust-${name}-${manifest.version}";
-            inherit allPlatformSet allComponentSet componentSet profileComponents targetExtensions;
-            inherit (manifest) targetComponentsList;
-            extensions = extensions;
-            targets = unique ([
-              rustHostPlatform # Build script requires host std.
-              rustTargetPlatform
-            ] ++ targets);
+      mkProfile =
+        name: profileComponents:
+        makeOverridable
+          (
+            {
+              extensions,
+              targets,
+              targetExtensions,
+            }:
+            mkAggregated {
+              pname = "rust-${name}";
+              inherit (manifest) version date;
+              availableComponents = componentSet.${rustHostPlatform};
+              selectedComponents = resolveComponents {
+                name = "rust-${name}-${manifest.version}";
+                inherit
+                  allPlatformSet
+                  allComponentSet
+                  componentSet
+                  profileComponents
+                  targetExtensions
+                  ;
+                inherit (manifest) targetComponentsList;
+                extensions = extensions;
+                targets = unique (
+                  [
+                    rustHostPlatform # Build script requires host std.
+                    rustTargetPlatform
+                  ]
+                  ++ targets
+                );
+              };
+            }
+          )
+          {
+            extensions = [ ];
+            targets = [ ];
+            targetExtensions = [ ];
           };
-        }
-      ) {
-        extensions = [];
-        targets = [];
-        targetExtensions = [];
-      };
 
-    profiles = mapAttrs mkProfile manifest.profiles;
+      profiles = mapAttrs mkProfile manifest.profiles;
 
-    result =
-      # Individual components.
-      componentSet.${rustHostPlatform} //
-      # Profiles.
-      profiles // {
-        # Legacy support for special pre-aggregated package.
-        # It has more components than `default` profile but less than `complete` profile.
-        rust =
-          let
-            pkg = mkProfile "legacy" [ "rust" ];
-          in if profiles != {} then
-            trace ''
-              Rust ${manifest.version}:
-              Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
-              Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
-              See README for more information.
-            '' pkg
-          else
-            pkg;
-      };
+      result =
+        # Individual components.
+        componentSet.${rustHostPlatform}
+        //
+          # Profiles.
+          profiles
+        // {
+          # Legacy support for special pre-aggregated package.
+          # It has more components than `default` profile but less than `complete` profile.
+          rust =
+            let
+              pkg = mkProfile "legacy" [ "rust" ];
+            in
+            if profiles != { } then
+              trace ''
+                Rust ${manifest.version}:
+                Pre-aggregated package `rust` is not encouraged for stable channel since it contains almost all and uncertain components.
+                Consider use `default` profile like `rust-bin.stable.latest.default` and override it with extensions you need.
+                See README for more information.
+              '' pkg
+            else
+              pkg;
+        };
 
-  in
+    in
     # If the platform is not supported for the current version, return nothing here,
     # so others can easily check it by `toolchain ? default`.
     optionalAttrs (componentSet ? ${rustHostPlatform}) result
