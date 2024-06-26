@@ -4,12 +4,21 @@ let
   inherit (builtins) match isString toString;
 
   inherit (lib)
-    attrNames concatMap elemAt filter hasAttr mapAttrs mapAttrs' removeSuffix;
+    attrNames
+    concatMap
+    elemAt
+    filter
+    hasAttr
+    mapAttrs
+    mapAttrs'
+    removeSuffix
+    ;
 
-  targets = import ../manifests/targets.nix // { _ = "*"; };
+  targets = import ../manifests/targets.nix // {
+    _ = "*";
+  };
   renamesList = import ../manifests/renames.nix;
   profilesList = import ../manifests/profiles.nix;
-
 
   # Extensions for mixed `rust` pkg.
   components = [
@@ -46,21 +55,26 @@ let
 
   # Uncompress the compressed manifest to the original one
   # (not complete but has enough information to make up the toolchain).
-  uncompressManifest = channel: version: {
-    v,        # Rustc version
-    d,        # Date
-    r,        # Renames index
-    p ? null, # Profiles index
-    ...
-  }@manifest: rec {
+  uncompressManifest =
+    channel: version:
+    {
+      v, # Rustc version
+      d, # Date
+      r, # Renames index
+      p ? null, # Profiles index
+      ...
+    }@manifest:
+    rec {
 
-    # Version used for derivation.
-    version = if match ".*(nightly|beta).*" v != null
-      then "${v}-${d}"  # 1.51.0-nightly-2021-01-01, 1.52.0-beta.2-2021-03-27
-      else v;           # 1.51.0
+      # Version used for derivation.
+      version =
+        if match ".*(nightly|beta).*" v != null then
+          "${v}-${d}" # 1.51.0-nightly-2021-01-01, 1.52.0-beta.2-2021-03-27
+        else
+          v; # 1.51.0
 
-    date = d;
-    renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
+      date = d;
+      renames = mapAttrs (from: to: { inherit to; }) (elemAt renamesList r);
 
     pkg =
       mapAttrs (pkgName: { u ? null /* Version appears in URL */, ... }@hashes: {
@@ -94,23 +108,25 @@ let
           results;
       }) (removeAttrs manifest ["v" "d" "r" "p"]);
 
-    profiles = if p == null
-      then {}
-      else elemAt profilesList p;
+      profiles = if p == null then { } else elemAt profilesList p;
 
-    targetComponentsList = [
-      "rust-std"
-      "rustc-dev"
-      "rustc-docs"
-    ];
-  };
+      targetComponentsList = [
+        "rust-std"
+        "rustc-dev"
+        "rustc-docs"
+      ];
+    };
 
-  uncompressManifestSet = channel: set: let
-    ret = mapAttrs (uncompressManifest channel) (removeAttrs set ["latest"]);
-  in ret // { latest = ret.${set.latest}; };
+  uncompressManifestSet =
+    channel: set:
+    let
+      ret = mapAttrs (uncompressManifest channel) (removeAttrs set [ "latest" ]);
+    in
+    ret // { latest = ret.${set.latest}; };
 
-in {
-  stable  = uncompressManifestSet "stable"  (import ../manifests/stable);
-  beta    = uncompressManifestSet "beta"    (import ../manifests/beta);
+in
+{
+  stable = uncompressManifestSet "stable" (import ../manifests/stable);
+  beta = uncompressManifestSet "beta" (import ../manifests/beta);
   nightly = uncompressManifestSet "nightly" (import ../manifests/nightly);
 }

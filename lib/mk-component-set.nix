@@ -1,34 +1,51 @@
 # Define component derivations and special treatments.
-{ lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs
-# The path to nixpkgs root.
-, path
-, toRustTarget, removeNulls
+{
+  lib,
+  stdenv,
+  stdenvNoCC,
+  gnutar,
+  autoPatchelfHook,
+  bintools,
+  zlib,
+  gccForLibs,
+  # The path to nixpkgs root.
+  path,
+  toRustTarget,
+  removeNulls,
 }:
 # Release version of the whole set.
-{ version
-# The host platform of this set.
-, platform
-# Set of pname -> src
-, srcs
-# { clippy.to = "clippy-preview"; }
-, renames
+{
+  version,
+  # The host platform of this set.
+  platform,
+  # Set of pname -> src
+  srcs,
+  # { clippy.to = "clippy-preview"; }
+  renames,
 }:
 let
-  inherit (lib) elem mapAttrs optional optionalString;
+  inherit (lib)
+    elem
+    mapAttrs
+    optional
+    optionalString
+    ;
   inherit (stdenv) hostPlatform;
 
-  mkComponent = pname: src: let
-    # These components link to `librustc_driver*.so` or `libLLVM*.so`.
-    linksToRustc = elem pname [
-      "clippy-preview"
-      "miri-preview"
-      "rls-preview"
-      "rust-analyzer-preview"
-      "rustc-codegen-cranelift-preview"
-      "rustc-dev"
-      "rustfmt-preview"
-    ];
-  in
+  mkComponent =
+    pname: src:
+    let
+      # These components link to `librustc_driver*.so` or `libLLVM*.so`.
+      linksToRustc = elem pname [
+        "clippy-preview"
+        "miri-preview"
+        "rls-preview"
+        "rust-analyzer-preview"
+        "rustc-codegen-cranelift-preview"
+        "rustc-dev"
+        "rustfmt-preview"
+      ];
+    in
     stdenvNoCC.mkDerivation rec {
       inherit pname version src;
       name = "${pname}-${version}-${platform}";
@@ -39,15 +56,22 @@ let
       # entire unpacked contents after just a little twiddling.
       preferLocalBuild = true;
 
-      nativeBuildInputs = [ gnutar ] ++
+      nativeBuildInputs =
+        [ gnutar ]
+        ++
         # Darwin doesn't use ELF, and they usually just work due to relative RPATH.
-        optional (!dontFixup && !hostPlatform.isDarwin) autoPatchelfHook ++
+        optional (!dontFixup && !hostPlatform.isDarwin) autoPatchelfHook
         # For `install_name_tool`.
-        optional (hostPlatform.isDarwin && linksToRustc) bintools;
+        ++ optional (hostPlatform.isDarwin && linksToRustc) bintools;
 
       buildInputs =
-        optional (elem pname [ "rustc" "cargo" "llvm-tools-preview" "rust" ]) zlib ++
-        optional linksToRustc self.rustc;
+        optional (elem pname [
+          "rustc"
+          "cargo"
+          "llvm-tools-preview"
+          "rust"
+        ]) zlib
+        ++ optional linksToRustc self.rustc;
 
       # Most of binaries links to `libgcc.so` on Linux, which lives in `gccForLibs.libgcc`
       # since https://github.com/NixOS/nixpkgs/pull/209870
@@ -64,8 +88,7 @@ let
       # N.B. `gcc` is a compiler which is sensitive to `targetPlatform`.
       # We use `depsHostHost` instead of `buildInputs` to force it ignore the target,
       # since binaries produced by `rustc` don't actually relies on this gccForLibs.
-      depsHostHost =
-        optional (!dontFixup && !hostPlatform.isDarwin) gccForLibs.lib;
+      depsHostHost = optional (!dontFixup && !hostPlatform.isDarwin) gccForLibs.lib;
 
       dontConfigure = true;
       dontBuild = true;
@@ -100,7 +123,10 @@ let
       '';
 
       # Only contain tons of html files. Don't waste time scanning files.
-      dontFixup = elem pname [ "rust-docs" "rustc-docs" ];
+      dontFixup = elem pname [
+        "rust-docs"
+        "rustc-docs"
+      ];
 
       # Darwin binaries usually just work... except for these linking to rustc from another drv.
       postFixup = optionalString (hostPlatform.isDarwin && linksToRustc) ''
@@ -142,7 +168,13 @@ let
       '';
 
       env = lib.optionalAttrs (pname == "rustc") {
-        inherit (stdenv.cc.bintools) expandResponseParams shell suffixSalt wrapperName coreutils_bin;
+        inherit (stdenv.cc.bintools)
+          expandResponseParams
+          shell
+          suffixSalt
+          wrapperName
+          coreutils_bin
+          ;
         hardening_unsupported_flags = "";
       };
 
@@ -152,6 +184,4 @@ let
   self = mapAttrs mkComponent srcs;
 
 in
-  removeNulls (
-    self //
-    mapAttrs (alias: { to }: self.${to} or null) renames)
+removeNulls (self // mapAttrs (alias: { to }: self.${to} or null) renames)

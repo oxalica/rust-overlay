@@ -1,4 +1,2 @@
 # For test only.
-import <nixpkgs> {
-  overlays = [ (import ./.) ];
-}
+import <nixpkgs> { overlays = [ (import ./.) ]; }

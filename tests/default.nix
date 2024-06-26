@@ -12,46 +12,80 @@ let
   pkgs = inputs.nixpkgs.legacyPackages.${system};
   rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
 
-  rust-bin = inputs.self.lib.mkRustBin {} pkgs;
-  inherit (rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
+  rust-bin = inputs.self.lib.mkRustBin { } pkgs;
+  inherit (rust-bin)
+    fromRustupToolchain
+    fromRustupToolchainFile
+    stable
+    beta
+    nightly
+    ;
 
-  assertEq = lhs: rhs:
-    if lhs == rhs
-    then pkgs.emptyFile
-    else derivation {
-      inherit system;
-      name = "assert-failure";
-      builder = "/bin/sh";
-      args = [ "-c" ''echo "LHS: $lhs"; echo "RHS: $rhs"; exit 1'' ];
-      lhs = builtins.toJSON lhs;
-      rhs = builtins.toJSON rhs;
-    };
+  assertEq =
+    lhs: rhs:
+    if lhs == rhs then
+      pkgs.emptyFile
+    else
+      derivation {
+        inherit system;
+        name = "assert-failure";
+        builder = "/bin/sh";
+        args = [
+          "-c"
+          ''echo "LHS: $lhs"; echo "RHS: $rhs"; exit 1''
+        ];
+        lhs = builtins.toJSON lhs;
+        rhs = builtins.toJSON rhs;
+      };
   assertUrl = drv: url: assertEq (head drv.src.urls) url;
 in
 # Check only tier 1 targets.
-optionalAttrs (elem system [ "aarch64-linux" "x86_64-linux" ]) {
-  url-no-arch = assertUrl stable."1.48.0".rust-src "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
-  url-kind-nightly = assertUrl nightly."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustHostPlatform}.tar.xz";
-  url-kind-beta = assertUrl beta."2021-01-01".rustc "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustHostPlatform}.tar.xz";
+optionalAttrs
+  (elem system [
+    "aarch64-linux"
+    "x86_64-linux"
+  ])
+  {
+    url-no-arch =
+      assertUrl stable."1.48.0".rust-src
+        "https://static.rust-lang.org/dist/2020-11-19/rust-src-1.48.0.tar.xz";
+    url-kind-nightly =
+      assertUrl nightly."2021-01-01".rustc
+        "https://static.rust-lang.org/dist/2021-01-01/rustc-nightly-${rustHostPlatform}.tar.xz";
+    url-kind-beta =
+      assertUrl beta."2021-01-01".rustc
+        "https://static.rust-lang.org/dist/2021-01-01/rustc-beta-${rustHostPlatform}.tar.xz";
 
-  name-stable = assertEq stable."1.48.0".rustc.name "rustc-1.48.0-${rustHostPlatform}";
-  name-beta = assertEq beta."2021-01-01".rustc.name "rustc-1.50.0-beta.2-2021-01-01-${rustHostPlatform}";
-  name-nightly = assertEq nightly."2021-01-01".rustc.name "rustc-1.51.0-nightly-2021-01-01-${rustHostPlatform}";
-  name-stable-profile-default = assertEq stable."1.51.0".default.name "rust-default-1.51.0";
-  name-stable-profile-minimal = assertEq stable."1.51.0".minimal.name "rust-minimal-1.51.0";
+    name-stable = assertEq stable."1.48.0".rustc.name "rustc-1.48.0-${rustHostPlatform}";
+    name-beta =
+      assertEq beta."2021-01-01".rustc.name
+        "rustc-1.50.0-beta.2-2021-01-01-${rustHostPlatform}";
+    name-nightly =
+      assertEq nightly."2021-01-01".rustc.name
+        "rustc-1.51.0-nightly-2021-01-01-${rustHostPlatform}";
+    name-stable-profile-default = assertEq stable."1.51.0".default.name "rust-default-1.51.0";
+    name-stable-profile-minimal = assertEq stable."1.51.0".minimal.name "rust-minimal-1.51.0";
 
-  url-kind-2 = assertUrl stable."1.48.0".cargo "https://static.rust-lang.org/dist/2020-11-19/cargo-1.48.0-${rustHostPlatform}.tar.xz";
-  url-kind-0 = assertUrl stable."1.47.0".cargo "https://static.rust-lang.org/dist/2020-10-08/cargo-0.48.0-${rustHostPlatform}.tar.xz";
-  url-kind-1 = assertUrl stable."1.34.2".llvm-tools-preview "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustHostPlatform}.tar.xz";
-  url-fix = assertUrl nightly."2019-01-10".rustc "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustHostPlatform}.tar.xz";
+    url-kind-2 =
+      assertUrl stable."1.48.0".cargo
+        "https://static.rust-lang.org/dist/2020-11-19/cargo-1.48.0-${rustHostPlatform}.tar.xz";
+    url-kind-0 =
+      assertUrl stable."1.47.0".cargo
+        "https://static.rust-lang.org/dist/2020-10-08/cargo-0.48.0-${rustHostPlatform}.tar.xz";
+    url-kind-1 =
+      assertUrl stable."1.34.2".llvm-tools-preview
+        "https://static.rust-lang.org/dist/2019-05-14/llvm-tools-1.34.2%20(6c2484dc3%202019-05-13)-${rustHostPlatform}.tar.xz";
+    url-fix =
+      assertUrl nightly."2019-01-10".rustc
+        "https://static.rust-lang.org/dist/2019-01-10/rustc-nightly-${rustHostPlatform}.tar.xz";
 
-  # 1.30.0 has `rustfmt` still in preview state.
-  rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
-  rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
+    # 1.30.0 has `rustfmt` still in preview state.
+    rename-unavailable = assertEq (stable."1.30.0" ? rustfmt) false;
+    rename-available = assertEq stable."1.48.0".rustfmt stable."1.48.0".rustfmt-preview;
 
-  latest-stable-legacy = assertEq latest.rustChannels.stable.rustc stable.latest.rustc;
-  latest-beta-legacy = assertEq latest.rustChannels.beta.rustc beta.latest.rustc;
-  latest-nightly-legacy = assertEq latest.rustChannels.nightly.rustc nightly.latest.rustc;
+    latest-stable-legacy = assertEq latest.rustChannels.stable.rustc stable.latest.rustc;
+    latest-beta-legacy = assertEq latest.rustChannels.beta.rustc beta.latest.rustc;
+    latest-nightly-legacy = assertEq latest.rustChannels.nightly.rustc nightly.latest.rustc;
 
   rust-channel-of-stable = assertEq (rustChannelOf { channel = "stable"; }).rustc stable.latest.rustc;
   rust-channel-of-beta = assertEq (rustChannelOf { channel = "beta"; }).rustc beta.latest.rustc;

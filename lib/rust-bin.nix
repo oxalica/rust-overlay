@@ -8,23 +8,48 @@
   nightly,
 }:
 let
-  inherit (builtins) compareVersions fromTOML match readFile tryEval;
+  inherit (builtins)
+    compareVersions
+    fromTOML
+    match
+    readFile
+    tryEval
+    ;
 
   inherit (lib)
-    any attrNames attrValues concatStringsSep elem elemAt filter flatten foldl'
-    hasPrefix head isString length listToAttrs makeOverridable mapAttrs
-    mapAttrsToList optional optionalAttrs replaceStrings substring trace unique;
+    any
+    attrNames
+    attrValues
+    concatStringsSep
+    elem
+    elemAt
+    filter
+    flatten
+    foldl'
+    hasPrefix
+    head
+    isString
+    length
+    listToAttrs
+    makeOverridable
+    mapAttrs
+    mapAttrsToList
+    optional
+    optionalAttrs
+    replaceStrings
+    substring
+    trace
+    unique
+    ;
 
   inherit (pkgs) stdenv callPackage fetchurl;
 
   # Remove keys from attrsets whose value is null.
-  removeNulls = set:
-    removeAttrs set
-      (filter (name: set.${name} == null)
-        (attrNames set));
+  removeNulls = set: removeAttrs set (filter (name: set.${name} == null) (attrNames set));
 
   # FIXME: https://github.com/NixOS/nixpkgs/pull/146274
-  toRustTarget' = platform:
+  toRustTarget' =
+    platform:
     if platform.isWasi then
       "${platform.parsed.cpu.name}-wasi"
     else
@@ -40,36 +65,50 @@ let
     toRustTarget = toRustTarget';
   };
 
-  mkAggregated = callPackage ./mk-aggregated.nix {};
+  mkAggregated = callPackage ./mk-aggregated.nix { };
 
   # Manifest selector.
-  selectManifest = { channel, date ? null }: let
-    assertWith = cond: msg: body: if cond then body else throw msg;
+  selectManifest =
+    {
+      channel,
+      date ? null,
+    }:
+    let
+      assertWith =
+        cond: msg: body:
+        if cond then body else throw msg;
 
-    # https://rust-lang.github.io/rustup/concepts/toolchains.html#toolchain-specification
-    # <channel> = stable|beta|nightly|<major.minor>|<major.minor.patch>
+      # https://rust-lang.github.io/rustup/concepts/toolchains.html#toolchain-specification
+      # <channel> = stable|beta|nightly|<major.minor>|<major.minor.patch>
 
-    asVersion = match "[0-9]+\\.[0-9]+(\\.[0-9]+)?" channel;
-    asNightlyDate = let m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel; in
-      if m == null then null else elemAt m 0;
-    asBetaDate = let m = match "beta-([0-9]+-[0-9]+-[0-9]+)" channel; in
-      if m == null then null else elemAt m 0;
+      asVersion = match "[0-9]+\\.[0-9]+(\\.[0-9]+)?" channel;
+      asNightlyDate =
+        let
+          m = match "nightly-([0-9]+-[0-9]+-[0-9]+)" channel;
+        in
+        if m == null then null else elemAt m 0;
+      asBetaDate =
+        let
+          m = match "beta-([0-9]+-[0-9]+-[0-9]+)" channel;
+        in
+        if m == null then null else elemAt m 0;
 
-    maxWith = zero: f: foldl' (lhs: rhs: if lhs == zero || f lhs rhs < 0 then rhs else lhs) zero;
+      maxWith = zero: f: foldl' (lhs: rhs: if lhs == zero || f lhs rhs < 0 then rhs else lhs) zero;
 
-    latestStableWithMajorMinor =
-      maxWith "" compareVersions
-        (filter (hasPrefix (channel + "."))
-          (attrNames manifests.stable));
+      latestStableWithMajorMinor = maxWith "" compareVersions (
+        filter (hasPrefix (channel + ".")) (attrNames manifests.stable)
+      );
 
-  in
+    in
     # "stable"
     if channel == "stable" then
-      assertWith (date == null) "Stable version with specific date is not supported"
-        manifests.stable.latest
+      assertWith (
+        date == null
+      ) "Stable version with specific date is not supported" manifests.stable.latest
     # "nightly"
     else if channel == "nightly" then
-      manifests.nightly.${if date != null then date else "latest"} or (throw "Nightly ${date} is not available")
+      manifests.nightly.${if date != null then date else "latest"}
+        or (throw "Nightly ${date} is not available")
     # "beta"
     else if channel == "beta" then
       manifests.beta.${if date != null then date else "latest"} or (throw "Beta ${date} is not available")
@@ -81,7 +120,8 @@ let
           manifests.stable.${latestStableWithMajorMinor} or (throw "No stable ${channel}.* is available")
         # "1.49.0"
         else
-          manifests.stable.${channel} or (throw "Stable ${channel} is not available"))
+          manifests.stable.${channel} or (throw "Stable ${channel} is not available")
+      )
     # "beta-2021-01-01"
     else if asBetaDate != null then
       assertWith (date == null) "Cannot specify date in both `channel` and `date`"
@@ -91,20 +131,32 @@ let
       assertWith (date == null) "Cannot specify date in both `channel` and `date`"
         manifests.nightly.${asNightlyDate} or (throw "Nightly ${asNightlyDate} is not available")
     # Otherwise
-    else throw "Unknown channel: ${channel}";
+    else
+      throw "Unknown channel: ${channel}";
 
   # Select a toolchain and aggregate components by rustup's `rust-toolchain` file format.
   # See: https://rust-lang.github.io/rustup/concepts/profiles.html
   # Or see source: https://github.com/rust-lang/rustup/blob/84974df1387812269c7b29fa5f3bb1c6480a6500/doc/src/overrides.md#the-toolchain-file
-  fromRustupToolchain = { path ? null, channel ? null, profile ? null, components ? [], targets ? [] }:
-    if path != null then throw "`path` is not supported, please directly add it to your PATH instead"
-    else if channel == null then throw "`channel` is required"
+  fromRustupToolchain =
+    {
+      path ? null,
+      channel ? null,
+      profile ? null,
+      components ? [ ],
+      targets ? [ ],
+    }:
+    if path != null then
+      throw "`path` is not supported, please directly add it to your PATH instead"
+    else if channel == null then
+      throw "`channel` is required"
     else
       let
-        toolchain = toolchainFromManifest (selectManifest { inherit channel; });
+        toolchain = toolchainFromManifest (selectManifest {
+          inherit channel;
+        });
         profile' = if profile == null then "default" else profile;
         pkg =
-          if toolchain._profiles != {} then
+          if toolchain._profiles != { } then
             toolchain._profiles.${profile'} or (throw ''
               Rust ${toolchain._version} doesn't have profile `${profile'}`.
               Available profiles are: ${concatStringsSep ", " (attrNames toolchain._profiles)}
@@ -114,27 +166,36 @@ let
             toolchain.rust
           else
             throw "Cannot select profile `${profile'}` since rust ${toolchain._version} is too early to support profiles";
-      in pkg.override {
+      in
+      pkg.override {
         extensions = components;
         inherit targets;
       };
 
   # Same as `fromRustupToolchain` but read from a `rust-toolchain` file (legacy one-line string or in TOML).
-  fromRustupToolchainFile = path: let
-    content = readFile path;
-    legacy = match "([^\r\n]+)\r?\n?" content;
-  in if legacy != null
-    then fromRustupToolchain { channel = head legacy; }
-    else fromRustupToolchain (fromTOML content).toolchain;
-
-  mkComponentSrc = { url, sha256 }:
+  fromRustupToolchainFile =
+    path:
     let
-      url' = replaceStrings [" "] ["%20"] url; # This is required or download will fail.
+      content = readFile path;
+      legacy = match "([^\r\n]+)\r?\n?" content;
+    in
+    if legacy != null then
+      fromRustupToolchain { channel = head legacy; }
+    else
+      fromRustupToolchain (fromTOML content).toolchain;
+
+  mkComponentSrc =
+    { url, sha256 }:
+    let
+      url' = replaceStrings [ " " ] [ "%20" ] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
       name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-      fetchurl { inherit name sha256; url = url'; };
+    fetchurl {
+      inherit name sha256;
+      url = url';
+    };
 
   # Resolve final components to install from mozilla-overlay style `extensions`, `targets` and `targetExtensions`.
   #
@@ -144,86 +205,105 @@ let
   #
   # Returns a list of component derivations, or throw if failed.
   resolveComponents =
-    { name
-    , componentSet
-    , allComponentSet
-    , allPlatformSet
-    , targetComponentsList
-    , profileComponents
-    , extensions
-    , targets
-    , targetExtensions
+    {
+      name,
+      componentSet,
+      allComponentSet,
+      allPlatformSet,
+      targetComponentsList,
+      profileComponents,
+      extensions,
+      targets,
+      targetExtensions,
     }:
     let
       # Components for target platform like `rust-std`.
-      collectTargetComponents = allowMissing: name:
+      collectTargetComponents =
+        allowMissing: name:
         let
-          targetSelected = flatten (map (tgt: componentSet.${tgt}.${name} or []) targets);
-        in if !allowMissing -> targetSelected != [] then
+          targetSelected = flatten (map (tgt: componentSet.${tgt}.${name} or [ ]) targets);
+        in
+        if !allowMissing -> targetSelected != [ ] then
           targetSelected
         else
           "Component `${name}` doesn't support any of targets: ${concatStringsSep ", " targets}";
 
-      collectComponents = allowMissing: name:
+      collectComponents =
+        allowMissing: name:
         if elem name targetComponentsList then
           collectTargetComponents allowMissing name
         else
           # Components for host platform like `rustc`.
-          componentSet.${rustHostPlatform}.${name} or (
-            if allowMissing then []
-            else "Host component `${name}` doesn't support `${rustHostPlatform}`");
+          componentSet.${rustHostPlatform}.${name}
+            or (if allowMissing then [ ] else "Host component `${name}` doesn't support `${rustHostPlatform}`");
 
       # Profile components can be skipped silently when missing.
       # Eg. `rust-mingw` on non-Windows platforms, or `rust-docs` on non-tier1 platforms.
       result =
-        flatten (map (collectComponents true) profileComponents) ++
-        flatten (map (collectComponents false) extensions) ++
-        flatten (map (collectTargetComponents false) targetExtensions);
+        flatten (map (collectComponents true) profileComponents)
+        ++ flatten (map (collectComponents false) extensions)
+        ++ flatten (map (collectTargetComponents false) targetExtensions);
 
-      isTargetUnused = target:
+      isTargetUnused =
+        target:
         !any (name: componentSet ? ${target}.${name})
           # FIXME: Get rid of the legacy component `rust`.
-          (filter (name: name == "rust" || elem name targetComponentsList)
-            (profileComponents ++ extensions)
-          ++ targetExtensions);
+          (
+            filter (name: name == "rust" || elem name targetComponentsList) (profileComponents ++ extensions)
+            ++ targetExtensions
+          );
 
       # Fail-fast for typo in `targets`, `extensions`, `targetExtensions`.
-      fastErrors =
-        flatten (
-          map (tgt: optional (!(allPlatformSet ? ${tgt}))
-            "Unknown target `${tgt}`, typo or not supported by this version?")
-            targets ++
-          map (name: optional (!(allComponentSet ? ${name}))
-            "Unknown component `${name}`, typo or not support by this version?")
-            (profileComponents ++ extensions ++ targetExtensions));
+      fastErrors = flatten (
+        map (
+          tgt:
+          optional (
+            !(allPlatformSet ? ${tgt})
+          ) "Unknown target `${tgt}`, typo or not supported by this version?"
+        ) targets
+        ++ map (
+          name:
+          optional (
+            !(allComponentSet ? ${name})
+          ) "Unknown component `${name}`, typo or not support by this version?"
+        ) (profileComponents ++ extensions ++ targetExtensions)
+      );
 
       errors =
-        if fastErrors != [] then
+        if fastErrors != [ ] then
           fastErrors
         else
-          filter isString result ++
-          map (tgt: "Target `${tgt}` is not supported by any components or extensions")
-            (filter isTargetUnused targets);
+          filter isString result
+          ++ map (tgt: "Target `${tgt}` is not supported by any components or extensions") (
+            filter isTargetUnused targets
+          );
 
-      notes = [
-        "note: profile components: ${toString profileComponents}"
-      ] ++ optional (targets != []) "note: selected targets: ${toString targets}"
-      ++ optional (extensions != []) "note: selected extensions: ${toString extensions}"
-      ++ optional (targetExtensions != []) "note: selected targetExtensions: ${toString targetExtensions}"
-      ++ flatten (map (platform:
-        optional (componentSet ? ${platform})
-          "note: components available for ${platform}: ${toString (attrNames componentSet.${platform})}"
-        ) (unique ([ rustHostPlatform ] ++ targets)))
-      ++ [
-        ''
-          note: check here to see all targets and which components are available on each targets:
-                https://rust-lang.github.io/rustup-components-history
-        ''
-      ];
+      notes =
+        [ "note: profile components: ${toString profileComponents}" ]
+        ++ optional (targets != [ ]) "note: selected targets: ${toString targets}"
+        ++ optional (extensions != [ ]) "note: selected extensions: ${toString extensions}"
+        ++ optional (
+          targetExtensions != [ ]
+        ) "note: selected targetExtensions: ${toString targetExtensions}"
+        ++ flatten (
+          map (
+            platform:
+            optional (componentSet ? ${platform})
+              "note: components available for ${platform}: ${toString (attrNames componentSet.${platform})}"
+          ) (unique ([ rustHostPlatform ] ++ targets))
+        )
+        ++ [
+          ''
+            note: check here to see all targets and which components are available on each targets:
+                  https://rust-lang.github.io/rustup-components-history
+          ''
+        ];
 
     in
-      if errors == [] then result
-      else throw ''
+    if errors == [ ] then
+      result
+    else
+      throw ''
         Component resolution failed for ${name}
         ${concatStringsSep "\n" (errors ++ notes)}
       '';
@@ -281,9 +361,13 @@ let
         mkComponentSet {
           inherit (manifest) version renames;
           inherit platform;
-          srcs = removeNulls
-            (mapAttrs (compName: { target, ... }:
-              let content = target.${platform} or target."*" or null; in
+          srcs = removeNulls (
+            mapAttrs (
+              compName:
+              { target, ... }:
+              let
+                content = target.${platform} or target."*" or null;
+              in
               if content == null then
                 null
               else
@@ -291,7 +375,8 @@ let
                   url = content.xz_url;
                   sha256 = content.xz_hash;
                 }
-            ) manifest.pkg);
+            ) manifest.pkg
+          );
         }
       ) allPlatformSet;
 
@@ -344,8 +429,8 @@ let
   in
     # If the platform is not supported for the current version, return nothing here,
     # so others can easily check it by `toolchain ? default`.
-    optionalAttrs (componentSet ? ${rustHostPlatform}) result //
-    {
+    optionalAttrs (componentSet ? ${rustHostPlatform}) result
+    // {
       # Internal use.
       _components = componentSet;
       _profiles = profiles;
@@ -356,31 +441,36 @@ let
   # From a git revision of rustc.
   # This does the same thing as crate `rustup-toolchain-install-master`.
   # But you need to manually provide component hashes.
-  fromRustcRev = {
-    # Package name of the derivation.
-    pname ? "rust-custom",
-    # Git revision of rustc.
-    rev,
-    # Version of the built package.
-    version ? substring 0 7 rev,
-    # Attrset with component name as key and its SRI hash as value.
-    components,
-    # Rust target to download.
-    target ? rustTargetPlatform
-  }: let
-    hashToSrc = compName: hash:
-      fetchurl {
-        url = if compName == "rust-src"
-          then "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly.tar.xz"
-          else "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
-        inherit hash;
+  fromRustcRev =
+    {
+      # Package name of the derivation.
+      pname ? "rust-custom",
+      # Git revision of rustc.
+      rev,
+      # Version of the built package.
+      version ? substring 0 7 rev,
+      # Attrset with component name as key and its SRI hash as value.
+      components,
+      # Rust target to download.
+      target ? rustTargetPlatform,
+    }:
+    let
+      hashToSrc =
+        compName: hash:
+        fetchurl {
+          url =
+            if compName == "rust-src" then
+              "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly.tar.xz"
+            else
+              "https://ci-artifacts.rust-lang.org/rustc-builds/${rev}/${compName}-nightly-${target}.tar.xz";
+          inherit hash;
+        };
+      components' = mkComponentSet {
+        inherit version;
+        platform = target;
+        srcs = mapAttrs hashToSrc components;
       };
-    components' = mkComponentSet {
-      inherit version;
-      platform = target;
-      srcs = mapAttrs hashToSrc components;
-    };
-  in
+    in
     mkAggregated {
       inherit pname version;
       date = null;
@@ -391,12 +481,16 @@ let
   # Some components are missing in some nightly releases.
   # Usage:
   # `selectLatestNightlyWith (toolchain: toolchain.default.override { extensions = ["llvm-tools-preview"]; })`
-  selectLatestNightlyWith = selector:
+  selectLatestNightlyWith =
+    selector:
     let
       nightlyDates = attrNames (removeAttrs nightly [ "latest" ]);
       dateLength = length nightlyDates;
-      go = idx:
-        let ret = selector (nightly.${elemAt nightlyDates idx}); in
+      go =
+        idx:
+        let
+          ret = selector (nightly.${elemAt nightlyDates idx});
+        in
         if idx == 0 then
           ret
         else if dateLength - idx >= 256 then
@@ -406,7 +500,7 @@ let
         else
           go (idx - 1);
     in
-      go (length nightlyDates - 1);
+    go (length nightlyDates - 1);
 
 in
 # For each channel:
@@ -425,8 +519,8 @@ in
 #
 # For a specific date of nightly:
 #   rust-bin.nightly."2020-01-01".default
-mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) manifests //
-{
+mapAttrs (channel: mapAttrs (version: toolchainFromManifest)) manifests
+// {
   inherit fromRustupToolchain fromRustupToolchainFile;
   inherit selectLatestNightlyWith;
   inherit fromRustcRev;
