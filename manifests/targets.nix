@@ -119,4 +119,5 @@
   _117 = "arm64ec-pc-windows-msvc";
   _118 = "loongarch64-unknown-linux-musl";
   _119 = "wasm32-wasip2";
+  _120 = "riscv64gc-unknown-linux-musl";
 }
