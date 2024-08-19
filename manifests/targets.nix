@@ -120,4 +120,6 @@
   _118 = "loongarch64-unknown-linux-musl";
   _119 = "wasm32-wasip2";
   _120 = "riscv64gc-unknown-linux-musl";
+  _121 = "aarch64-apple-ios-macabi";
+  _122 = "x86_64-apple-ios-macabi";
 }
