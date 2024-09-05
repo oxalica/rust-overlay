@@ -4,6 +4,12 @@ on:
     # The nightly channel is usually updated at 01:00:00 UTC.
     - cron: '0 2 * * *' # *-*-* 02:00:00 UTC
 
+    # The stable channel is usually updated before 17:00:00 UTC on Thursday.
+    # It seems there are some stable users eagerly want to use the latest stable and
+    # cannot afford a lengthy 24hrs delay. So poll once every hour here. ¯\_(ツ)_/¯
+    # See: https://github.com/oxalica/rust-overlay/pull/166
+    - cron: '0 14-20 * * THU' # Thu *-*-* 14..19:00:00 UTC
+
   workflow_dispatch:
 
 permissions:
@@ -37,12 +43,14 @@ jobs:
       run: ./scripts/fetch.py stable
 
     - name: Sync beta channel
+      if: github.event.schedule != '0 14-20 * * THU'
       timeout-minutes: 5
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: ./scripts/fetch.py beta
 
     - name: Sync nightly channel
+      if: github.event.schedule != '0 14-20 * * THU'
       timeout-minutes: 5
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
