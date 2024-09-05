@@ -379,6 +379,8 @@ let
       inherit version;
       platform = target;
       srcs = mapAttrs hashToSrc components;
+      # We cannot know aliases in this case.
+      renames = { };
     };
   in
     mkAggregated {
