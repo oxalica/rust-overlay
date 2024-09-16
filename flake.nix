@@ -51,6 +51,18 @@
 
     # TODO: Flake outputs except `overlay[s]` are not stabilized yet.
 
+    templates =
+      let
+        hello-flake = {
+          path = ./examples/hello-flake;
+          description = "An example devShell with flakes";
+        };
+      in
+        {
+          default = hello-flake;
+          inherit hello-flake;
+        }
+
     packages =
       let
         select = version: comps:
