@@ -61,7 +61,7 @@
         {
           default = hello-flake;
           inherit hello-flake;
-        }
+        };
 
     packages =
       let
