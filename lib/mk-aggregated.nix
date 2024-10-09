@@ -1,4 +1,4 @@
-{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl, libsecret }:
+{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl }:
 { pname, version, date, selectedComponents, availableComponents ? selectedComponents }:
 let
   inherit (lib) optional;
