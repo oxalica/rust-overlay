@@ -56,11 +56,6 @@ symlinkJoin {
         ''}
       fi
     done
-    ${lib.optionalString stdenv.isLinux ''
-      cp --remove-destination "$(realpath -e $out/bin/cargo)" $out/bin/cargo
-      chmod +w $out/bin/cargo
-      patchelf --add-needed ${libsecret}/lib/libsecret-1.so.0 $out/bin/cargo
-    ''}
     ${lib.optionalString stdenv.isDarwin ''
       cargo="$out/bin/cargo"
       if [ -e "$cargo" ]; then
