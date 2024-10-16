@@ -1,4 +1,4 @@
-{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl }:
+{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl, rustc }:
 { pname, version, date, selectedComponents, availableComponents ? selectedComponents }:
 let
   inherit (lib) optional;
@@ -10,7 +10,19 @@ symlinkJoin {
 
   paths = selectedComponents;
 
-  passthru = { inherit availableComponents; };
+  passthru = {
+    inherit availableComponents;
+
+    # These are used by `buildRustPackage` for default `meta`. We forward
+    # them to nixpkgs' rustc, or fallback to sane defaults. False-positive
+    # is better than false-negative which causes eval failures.
+    # See:
+    # - https://github.com/oxalica/rust-overlay/issues/191
+    # - https://github.com/NixOS/nixpkgs/pull/338999
+    targetPlatforms = rustc.targetPlatform or lib.platforms.all;
+    tier1TargetPlatforms = rustc.tier1TargetPlatforms or lib.platforms.all;
+    badTargetPlatforms = rustc.badTargetPlatforms or [ ];
+  };
 
   # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
   # they are offset 0 propagated.
