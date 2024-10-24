@@ -122,4 +122,5 @@
   _120 = "riscv64gc-unknown-linux-musl";
   _121 = "aarch64-apple-ios-macabi";
   _122 = "x86_64-apple-ios-macabi";
+  _123 = "wasm32v1-none";
 }
