@@ -1,5 +1,6 @@
 # Define component derivations and special treatments.
 { lib, stdenv, stdenvNoCC, gnutar, autoPatchelfHook, bintools, zlib, gccForLibs
+, apple-sdk ? null
 , pkgsHostHost
 # The path to nixpkgs root.
 , path
@@ -16,7 +17,7 @@
 }:
 let
   inherit (lib) elem mapAttrs optional optionalString;
-  inherit (stdenv) hostPlatform;
+  inherit (stdenv) hostPlatform targetPlatform;
 
   mkComponent = pname: src: let
     # These components link to `librustc_driver*.so` or `libLLVM*.so`.
@@ -131,6 +132,18 @@ let
           substituteAll ${path + "/pkgs/build-support/wrapper-common/utils.bash"} $out/nix-support/utils.bash
           substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-flags.sh"} $out/nix-support/add-flags.sh
           substituteAll ${path + "/pkgs/build-support/bintools-wrapper/add-hardening.sh"} $out/nix-support/add-hardening.sh
+          ${
+            let
+              # This script exists on all platforms, but only in recent nixpkgs.
+              p = path + "/pkgs/build-support/wrapper-common/darwin-sdk-setup.bash";
+            in optionalString (builtins.pathExists p) ''
+              substituteAll ${p} $out/nix-support/darwin-sdk-setup.bash
+            '' + optionalString targetPlatform.isDarwin ''
+              substituteAll \
+                ${path + "/pkgs/build-support/bintools-wrapper/add-darwin-ldflags-before.sh"} \
+                $out/nix-support/add-local-ldflags-before.sh
+            ''
+          }
 
           for dst in "''${dsts[@]}"; do
             # The ld.lld is path/name sensitive because itself is a wrapper. Keep its original name.
@@ -145,10 +158,19 @@ let
         patchelf --add-needed ${pkgsHostHost.libsecret}/lib/libsecret-1.so.0 $out/bin/cargo
       '';
 
-      env = lib.optionalAttrs (pname == "rustc") {
+      env = lib.optionalAttrs (pname == "rustc") ({
         inherit (stdenv.cc.bintools) expandResponseParams shell suffixSalt wrapperName coreutils_bin;
         hardening_unsupported_flags = "";
-      };
+
+        # These envvars are used by darwin specific scripts.
+        # See: https://github.com/NixOS/nixpkgs/blob/0a14706530dcb90acecb81ce0da219d88baaae75/pkgs/build-support/bintools-wrapper/default.nix
+        fallback_sdk = optionalString (apple-sdk != null && targetPlatform.isDarwin)
+          (apple-sdk.__spliced.buildTarget or apple-sdk);
+      } // lib.mapAttrs (_: lib.optionalString targetPlatform.isDarwin) {
+        inherit (targetPlatform)
+          darwinPlatform darwinSdkVersion
+          darwinMinVersion darwinMinVersionVariable;
+      });
 
       dontStrip = true;
     };
