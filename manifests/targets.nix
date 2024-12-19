@@ -123,4 +123,5 @@
   _121 = "aarch64-apple-ios-macabi";
   _122 = "x86_64-apple-ios-macabi";
   _123 = "wasm32v1-none";
+  _124 = "powerpc64le-unknown-linux-musl";
 }
