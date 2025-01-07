@@ -173,6 +173,13 @@ let
       });
 
       dontStrip = true;
+
+      meta = lib.optionalAttrs (elem pname [ "rustc" "rustfmt-preview" "rust-analyzer-preview" "clippy-preview" "miri-preview" ] ) ({
+        mainProgram = let
+          renamedAttrs = attrsToList (filterAttrs (_: v: v.to == pname) renames);
+          firstName = if renamedAttrs != [] then (head renamedAttrs).name else pname;
+        in firstName;
+      });
     };
 
   self = mapAttrs mkComponent srcs;
