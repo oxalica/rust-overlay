@@ -3,7 +3,6 @@
 {
   lib,
   pkgs,
-  toRustTarget,
   manifests,
   nightly,
 }:
@@ -23,21 +22,15 @@ let
       (filter (name: set.${name} == null)
         (attrNames set));
 
-  # FIXME: https://github.com/NixOS/nixpkgs/pull/146274
-  toRustTarget' = platform:
-    if platform.isWasi then
-      "${platform.parsed.cpu.name}-wasi"
-    else
-      platform.rust.rustcTarget or (toRustTarget platform);
+  toRustTarget = platform: platform.rust.rustcTarget;
 
   # The platform where `rustc` is running.
-  rustHostPlatform = toRustTarget' stdenv.hostPlatform;
+  rustHostPlatform = toRustTarget stdenv.hostPlatform;
   # The platform of binary which `rustc` produces.
-  rustTargetPlatform = toRustTarget' stdenv.targetPlatform;
+  rustTargetPlatform = toRustTarget stdenv.targetPlatform;
 
   mkComponentSet = callPackage ./mk-component-set.nix {
-    inherit removeNulls;
-    toRustTarget = toRustTarget';
+    inherit removeNulls toRustTarget;
   };
 
   mkAggregated = callPackage ./mk-aggregated.nix {};
