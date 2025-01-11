@@ -22,7 +22,7 @@ Features:
 
   Stable versions will not be purged currently.
 
-- Current oldest supported nightly version is 2023-01-01.
+- Current oldest supported nightly version is 2024-01-01.
 
   To prevent significant repository size bloating, our current strategy is keep
   only nightly and beta versions not earlier than `{current_year - 1}-01-01`.
