@@ -27,7 +27,6 @@ in {
     distRoot = import ./lib/dist-root.nix;
   } // import ./lib/rust-bin.nix {
     inherit lib manifests;
-    inherit (final.rust) toRustTarget;
     inherit (rust-bin) nightly;
     pkgs = final;
   };

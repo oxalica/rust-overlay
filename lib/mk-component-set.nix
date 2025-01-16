@@ -170,6 +170,10 @@ let
       });
 
       dontStrip = true;
+
+      meta = lib.optionalAttrs (elem pname [ "rustc" "rustfmt-preview" "rust-analyzer-preview" "cargo" ] ) ({
+        mainProgram = lib.removeSuffix "-preview" pname;
+      });
     };
 
   self = mapAttrs mkComponent srcs;

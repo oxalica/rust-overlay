@@ -99,7 +99,7 @@ jobs:
         os: [ubuntu-latest, macos-latest]
         rust-channel: [stable, beta, nightly]
         profile: [minimal, default]
-        nixpkgs-channel: [nixpkgs-unstable, nixos-23.05]
+        nixpkgs-channel: [nixpkgs-unstable, nixos-24.11]
         include:
           # The legacy package, used by compatible functions.
           - os: ubuntu-latest
