@@ -11,7 +11,7 @@ let
   inherit (pkgs-compat) latest rustChannelOf;
 
   pkgs = inputs.nixpkgs.legacyPackages.${system};
-  rustHostPlatform = pkgs.rust.toRustTarget pkgs.hostPlatform;
+  rustHostPlatform = pkgs.hostPlatform.rust.rustcTarget;
 
   rust-bin = inputs.self.lib.mkRustBin {} pkgs;
   inherit (rust-bin) fromRustupToolchain fromRustupToolchainFile stable beta nightly;
