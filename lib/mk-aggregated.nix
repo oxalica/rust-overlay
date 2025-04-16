@@ -19,7 +19,7 @@ symlinkJoin {
     # See:
     # - https://github.com/oxalica/rust-overlay/issues/191
     # - https://github.com/NixOS/nixpkgs/pull/338999
-    targetPlatforms = rustc.targetPlatform or lib.platforms.all;
+    targetPlatforms = rustc.targetPlatforms or lib.platforms.all;
     tier1TargetPlatforms = rustc.tier1TargetPlatforms or lib.platforms.all;
     badTargetPlatforms = rustc.badTargetPlatforms or [ ];
   };
