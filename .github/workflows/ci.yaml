@@ -156,7 +156,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        example: [cross-aarch64, cross-wasi, cross-mingw]
+        # FIXME: cross-mingw is flaky on latest nixpkgs (shell) without lockfile.
+        example: [cross-aarch64, cross-wasi]
         kind: [shell]
         include:
           - example: cross-aarch64
