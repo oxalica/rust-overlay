@@ -88,5 +88,12 @@ To try it,
 2. `nix develop` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
+Another example without `mkRustBin` can be seen in
+[`examples/cross-mingw/flake.nix`](../examples/cross-mingw/flake.nix) (cross-compiling to Windows).
+To try it,
+1. `cd` into `examples/cross-mingw`.
+2. `nix develop` to enter the development environment.
+3. `make run` to build and run the program with Wine.
+
 [wiki-cross]: https://wiki.nixos.org/wiki/Cross_Compiling#How_to_specify_dependencies
 [flake-cross-issue]: https://github.com/NixOS/nix/issues/5157
