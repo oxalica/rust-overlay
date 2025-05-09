@@ -76,9 +76,14 @@ get corresponding compiler toolchains for them.
 let
   pkgs = nixpkgs.legacyPackages.x86_64-linux.pkgsCross.aarch64-multiplatform;
   rust-bin = rust-overlay.lib.mkRustBin { } pkgs.buildPackages;
-in pkgs.mkShell {
-  nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
-}
+in
+# Need `callPackage` here, see https://github.com/NixOS/nixpkgs/issues/49526
+pkgs.callPackage (
+  { mkShell }:
+  mkShell {
+    nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
+  }
+) { }
 ```
 
 The full example can be seen in
