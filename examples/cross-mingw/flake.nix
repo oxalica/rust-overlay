@@ -14,7 +14,7 @@
     system = "x86_64-linux";
     pkgs = import nixpkgs {
       inherit system;
-      overlays = [ (import rust-overlay) ];
+      overlays = [ rust-overlay.overlays.default ];
       crossSystem.config = "x86_64-w64-mingw32";
     };
   in
