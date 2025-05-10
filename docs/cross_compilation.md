@@ -88,7 +88,7 @@ To try it,
 2. `nix develop` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
-Another example without `mkRustBin` can be seen in
+Alternatively, you may use the common `import nixpkgs`-approach instead of `mkRustBin`, especially if you only plan to `import nixpkgs` once. This is probably the case for a typical simple and small project. An example of this can be seen in
 [`examples/cross-mingw/flake.nix`](../examples/cross-mingw/flake.nix) (cross-compiling to Windows).
 To try it,
 1. `cd` into `examples/cross-mingw`.
