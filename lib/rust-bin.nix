@@ -289,10 +289,11 @@ let
       ) allPlatformSet;
 
     mkProfile = name: profileComponents:
-      makeOverridable ({ extensions, targets, targetExtensions }:
+      makeOverridable ({ extensions, targets, targetExtensions, stdenvSelector }:
         mkAggregated {
           pname = "rust-${name}";
           inherit (manifest) version date;
+          inherit stdenvSelector;
           availableComponents = componentSet.${rustHostPlatform};
           selectedComponents = resolveComponents {
             name = "rust-${name}-${manifest.version}";
@@ -309,6 +310,7 @@ let
         extensions = [];
         targets = [];
         targetExtensions = [];
+        stdenvSelector = pkgs: pkgs.stdenv;
       };
 
     profiles = mapAttrs mkProfile manifest.profiles;
