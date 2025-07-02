@@ -160,6 +160,8 @@ Just replace `rust-overlay.overlays.default` or `(import rust-overlay)` into:
 })
 ```
 
+For more information, see [reference.md](./docs/reference.md).
+
 ### Migration from [nixpkgs-mozilla]
 
 1. Change the channel URL to `https://github.com/oxalica/rust-overlay/archive/master.tar.gz`,
