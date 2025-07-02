@@ -148,6 +148,18 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
 ```
 
+#### Change Default `DistRoot`:
+
+- An example for [RsProxy](rsproxy.cn):
+
+Just replace `rust-overlay.overlays.default` or `(import rust-overlay)` into:
+
+```nix
+(final: prev: {
+  rust-bin = rust-overlay.lib.mkRustBin {distRoot = "https://rsproxy.cn";} prev;
+})
+```
+
 ### Migration from [nixpkgs-mozilla]
 
 1. Change the channel URL to `https://github.com/oxalica/rust-overlay/archive/master.tar.gz`,
