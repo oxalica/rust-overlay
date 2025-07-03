@@ -150,6 +150,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
 #### Change Default `DistRoot`:
 
+- e.g. `RUSTUP_DIST_SERVER`=`"https://example.com"`
 
 Just replace `rust-overlay.overlays.default` or `(import rust-overlay)` into:
 
