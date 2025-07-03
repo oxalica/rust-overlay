@@ -156,7 +156,7 @@ Just replace `rust-overlay.overlays.default` or `(import rust-overlay)` into:
 
 ```nix
 (final: prev: {
-  rust-bin = rust-overlay.lib.mkRustBin {distRoot = "https://rsproxy.cn/dist";} prev;
+  rust-bin = rust-overlay.lib.mkRustBin { distRoot = "https://example.com/dist"; } prev;
 })
 ```
 
