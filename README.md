@@ -150,7 +150,6 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
 #### Change Default `DistRoot`:
 
-- An example for [RsProxy](rsproxy.cn):
 
 Just replace `rust-overlay.overlays.default` or `(import rust-overlay)` into:
 
