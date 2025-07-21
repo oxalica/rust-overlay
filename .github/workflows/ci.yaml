@@ -16,6 +16,16 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: Nixfmt
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - uses: cachix/install-nix-action@v25
+      with:
+        nix_path: nixpkgs=channel:nixos-unstable
+    - run: nix shell nixpkgs#fd nixpkgs#nixfmt --command fd -e nix --exclude manifests --exec-batch nixfmt --check
+
   flake-check:
     name: Flake check
     runs-on: ubuntu-latest
