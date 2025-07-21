@@ -3,18 +3,28 @@
 (import <nixpkgs> {
   crossSystem = "aarch64-linux";
   overlays = [ (import ../..) ];
-}).callPackage (
-{ mkShell, stdenv, rust-bin, pkg-config, openssl, qemu }:
-mkShell {
-  nativeBuildInputs = [
-    rust-bin.stable.latest.minimal
-    pkg-config
-  ];
+}).callPackage
+  (
+    {
+      mkShell,
+      stdenv,
+      rust-bin,
+      pkg-config,
+      openssl,
+      qemu,
+    }:
+    mkShell {
+      nativeBuildInputs = [
+        rust-bin.stable.latest.minimal
+        pkg-config
+      ];
 
-  depsBuildBuild = [ qemu ];
+      depsBuildBuild = [ qemu ];
 
-  buildInputs = [ openssl ];
+      buildInputs = [ openssl ];
 
-  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = "${stdenv.cc.targetPrefix}cc";
-  CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER = "qemu-aarch64";
-}) {}
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER = "${stdenv.cc.targetPrefix}cc";
+      CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_RUNNER = "qemu-aarch64";
+    }
+  )
+  { }
