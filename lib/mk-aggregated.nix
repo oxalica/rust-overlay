@@ -1,5 +1,19 @@
-{ lib, stdenv, symlinkJoin, pkgsTargetTarget, bash, curl, rustc }:
-{ pname, version, date, selectedComponents, availableComponents ? selectedComponents }:
+{
+  lib,
+  stdenv,
+  symlinkJoin,
+  pkgsTargetTarget,
+  bash,
+  curl,
+  rustc,
+}:
+{
+  pname,
+  version,
+  date,
+  selectedComponents,
+  availableComponents ? selectedComponents,
+}:
 let
   inherit (lib) optional;
   inherit (stdenv) targetPlatform;
@@ -34,12 +48,10 @@ symlinkJoin {
   # CC for crate linking.
   # Workaround: should be `pkgsHostTarget.cc` but `stdenv`'s cc itself have -1 offset.
   # N.B. WASM targets don't need our CC.
-  propagatedBuildInputs =
-    optional (!targetPlatform.isWasm) pkgsTargetTarget.stdenv.cc;
+  propagatedBuildInputs = optional (!targetPlatform.isWasm) pkgsTargetTarget.stdenv.cc;
 
   # Link dependency for target, required by darwin std.
-  depsTargetTargetPropagated =
-    optional (targetPlatform.isDarwin) pkgsTargetTarget.libiconv;
+  depsTargetTargetPropagated = optional (targetPlatform.isDarwin) pkgsTargetTarget.libiconv;
 
   # If rustc or rustdoc is in the derivation, we need to copy their
   # executable into the final derivation. This is required

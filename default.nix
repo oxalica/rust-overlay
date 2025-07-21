@@ -21,15 +21,19 @@ let
     inherit (rust-bin) distRoot;
   };
 
-in {
-  rust-bin = (prev.rust-bin or { }) // {
-    # The overridable dist url for fetching.
-    distRoot = import ./lib/dist-root.nix;
-  } // import ./lib/rust-bin.nix {
-    inherit lib manifests;
-    inherit (rust-bin) nightly;
-    pkgs = final;
-  };
+in
+{
+  rust-bin =
+    (prev.rust-bin or { })
+    // {
+      # The overridable dist url for fetching.
+      distRoot = import ./lib/dist-root.nix;
+    }
+    // import ./lib/rust-bin.nix {
+      inherit lib manifests;
+      inherit (rust-bin) nightly;
+      pkgs = final;
+    };
 
   # All attributes below are for compatibility with mozilla overlay.
 
@@ -45,17 +49,24 @@ in {
         Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
         See also README at https://github.com/oxalica/rust-overlay
       '';
-      fromManifestFile = manifestFilePath: { stdenv, fetchurl, patchelf }@deps: builtins.trace ''
-        `fromManifestFile` is deprecated.
-        Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
-        See also README at https://github.com/oxalica/rust-overlay
-      '' (overrideToolchain deps (toolchainFromManifestFile manifestFilePath));
+      fromManifestFile =
+        manifestFilePath:
+        {
+          stdenv,
+          fetchurl,
+          patchelf,
+        }@deps:
+        builtins.trace ''
+          `fromManifestFile` is deprecated.
+          Select a toolchain from `rust-bin` or using `rustChannelOf` instead.
+          See also README at https://github.com/oxalica/rust-overlay
+        '' (overrideToolchain deps (toolchainFromManifestFile manifestFilePath));
     };
   };
 
   rustChannelOf = manifestArgs: toolchainFromManifest (selectManifest manifestArgs);
 
-  latest = (prev.latest or {}) // {
+  latest = (prev.latest or { }) // {
     rustChannels = {
       stable = rust-bin.stable.latest;
       beta = rust-bin.beta.latest;
@@ -63,9 +74,9 @@ in {
     };
   };
 
-  rustChannelOfTargets = channel: date: targets:
-    (final.rustChannelOf { inherit channel date; })
-      .rust.override { inherit targets; };
+  rustChannelOfTargets =
+    channel: date: targets:
+    (final.rustChannelOf { inherit channel date; }).rust.override { inherit targets; };
 
   rustChannels = final.latest.rustChannels;
 }
