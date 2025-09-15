@@ -27,7 +27,7 @@
     mkShellNoCC {
       nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
 
-      depsBuildBuild = [ wasmtime ];
+      depsBuildBuild = [ wasmtime.out ];
 
       # This is optional for wasm32-like targets, since rustc will automatically use
       # the bundled `lld` for linking.
