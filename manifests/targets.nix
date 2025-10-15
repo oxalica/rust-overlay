@@ -124,4 +124,6 @@
   _122 = "x86_64-apple-ios-macabi";
   _123 = "wasm32v1-none";
   _124 = "powerpc64le-unknown-linux-musl";
+  _125 = "armv7a-none-eabihf";
+  _126 = "armv8r-none-eabihf";
 }
