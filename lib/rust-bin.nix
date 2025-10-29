@@ -182,7 +182,7 @@ let
       url' = replaceStrings [ " " ] [ "%20" ] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
-      name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
+      name = if matchParenPart == null then null else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
     fetchurl {
       inherit name sha256;
