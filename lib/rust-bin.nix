@@ -182,12 +182,22 @@ let
       url' = replaceStrings [ " " ] [ "%20" ] url; # This is required or download will fail.
       # Filter names like `llvm-tools-1.34.2 (6c2484dc3 2019-05-13)-aarch64-unknown-linux-gnu.tar.xz`
       matchParenPart = match ".*/([^ /]*) [(][^)]*[)](.*)" url;
-      name = if matchParenPart == null then "" else (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
     in
-    fetchurl {
-      inherit name sha256;
-      url = url';
-    };
+    # NB: This seems verbose, but we do not know the default special-cased `name` is.
+    # It used to be "", but changed to `null` later. We also do not know the exact
+    # revision of nixpkgs we are currently using.
+    # See: <http://github.com/NixOS/nixpkgs/commit/1ec0227cc062251c36140ef1e7c37b1cd1b370f1>
+    if matchParenPart != null then
+      fetchurl {
+        name = (elemAt matchParenPart 0) + (elemAt matchParenPart 1);
+        inherit sha256;
+        url = url';
+      }
+    else
+      fetchurl {
+        inherit sha256;
+        url = url';
+      };
 
   # Resolve final components to install from mozilla-overlay style `extensions`, `targets` and `targetExtensions`.
   #
