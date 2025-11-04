@@ -15,18 +15,25 @@
     useLLVM = true;
   };
   overlays = [ (import ../..) ];
-}).callPackage (
-# We don't need WASI C compiler from nixpkgs, so use `mkShellNoCC`.
-{ mkShellNoCC, stdenv, rust-bin, wasmtime }:
-mkShellNoCC {
-  nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
+}).callPackage
+  (
+    # We don't need WASI C compiler from nixpkgs, so use `mkShellNoCC`.
+    {
+      mkShellNoCC,
+      stdenv,
+      rust-bin,
+      wasmtime,
+    }:
+    mkShellNoCC {
+      nativeBuildInputs = [ rust-bin.stable.latest.minimal ];
 
-  depsBuildBuild = [ wasmtime ];
+      depsBuildBuild = [ wasmtime ];
 
-  # This is optional for wasm32-like targets, since rustc will automatically use
-  # the bundled `lld` for linking.
-  # CARGO_TARGET_WASM32_WASIP1_LINKER =
+      # This is optional for wasm32-like targets, since rustc will automatically use
+      # the bundled `lld` for linking.
+      # CARGO_TARGET_WASM32_WASIP1_LINKER =
 
-  CARGO_TARGET_WASM32_WASIP1_RUNNER = "wasmtime run";
-}) {}
-
+      CARGO_TARGET_WASM32_WASIP1_RUNNER = "wasmtime run";
+    }
+  )
+  { }
