@@ -16,16 +16,26 @@ permissions:
   contents: read
 
 jobs:
+  format:
+    name: Nixfmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+        with:
+          nix_path: nixpkgs=channel:nixos-unstable
+      - run: nix shell nixpkgs#fd nixpkgs#nixfmt --command fd -e nix --exclude manifests --exec-batch nixfmt --check
+
   flake-check:
     name: Flake check
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v25
+      uses: cachix/install-nix-action@v31
       with:
         nix_path: nixpkgs=channel:nixos-unstable
 
@@ -38,10 +48,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v25
+      uses: cachix/install-nix-action@v31
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
@@ -113,10 +123,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v25
+      uses: cachix/install-nix-action@v31
       with:
         nix_path: nixpkgs=channel:${{ matrix.nixpkgs-channel }}
         install_url: ${{ matrix.nix_install_url }}
@@ -165,10 +175,10 @@ jobs:
 
     steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Install Nix
-      uses: cachix/install-nix-action@v25
+      uses: cachix/install-nix-action@v31
       with:
         nix_path: nixpkgs=channel:nixpkgs-unstable
 
