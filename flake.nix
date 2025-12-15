@@ -6,10 +6,18 @@
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    manifests = {
+      url = "github:oxalica/rust-overlay/manifests/full";
+      flake = false;
+    };
   };
 
   outputs =
-    { self, nixpkgs }@inputs:
+    {
+      self,
+      nixpkgs,
+      manifests,
+    }@inputs:
     let
       inherit (nixpkgs) lib;
       inherit (lib) filterAttrs mapAttrs' replaceStrings;
@@ -19,7 +27,12 @@
       overlay = import ./.;
 
       defaultDistRoot = import ./lib/dist-root.nix;
-      mkManifests = distRoot: import ./lib/manifests.nix { inherit lib distRoot; };
+      mkManifests =
+        distRoot:
+        import ./lib/manifests.nix {
+          inherit lib distRoot;
+          src = manifests;
+        };
 
       # Builder to construct `rust-bin` interface on an existing `pkgs`.
       # This would be immutable, non-intrusive and (hopefully) can benefit from

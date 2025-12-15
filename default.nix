@@ -19,6 +19,15 @@ let
   manifests = import ./lib/manifests.nix {
     inherit lib;
     inherit (rust-bin) distRoot;
+    src =
+      builtins.warn
+        "FIXME: rust-overlay's non-flake interface (default.nix) currently uses impure fetchGit"
+        (
+          builtins.fetchGit {
+            url = "https://github.com/oxalica/rust-overlay.git";
+            ref = "manifests/full";
+          }
+        );
   };
 
 in

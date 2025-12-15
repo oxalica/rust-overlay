@@ -1,5 +1,9 @@
 # Manifests which describe the content of each version.
-{ lib, distRoot }:
+{
+  lib,
+  distRoot,
+  src,
+}:
 let
   inherit (builtins) match isString toString;
 
@@ -14,11 +18,11 @@ let
     removeSuffix
     ;
 
-  targets = import ../manifests/targets.nix // {
+  targets = import (src + "/manifests/targets.nix") // {
     _ = "*";
   };
-  renamesList = import ../manifests/renames.nix;
-  profilesList = import ../manifests/profiles.nix;
+  renamesList = import (src + "/manifests/renames.nix");
+  profilesList = import (src + "/manifests/profiles.nix");
 
   # Extensions for mixed `rust` pkg.
   components = [
@@ -155,7 +159,7 @@ let
 
 in
 {
-  stable = uncompressManifestSet "stable" (import ../manifests/stable);
-  beta = uncompressManifestSet "beta" (import ../manifests/beta);
-  nightly = uncompressManifestSet "nightly" (import ../manifests/nightly);
+  stable = uncompressManifestSet "stable" (import (src + "/manifests/stable"));
+  beta = uncompressManifestSet "beta" (import (src + "/manifests/beta"));
+  nightly = uncompressManifestSet "nightly" (import (src + "/manifests/nightly"));
 }
