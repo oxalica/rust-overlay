@@ -3,6 +3,7 @@
   stdenv,
   symlinkJoin,
   pkgsTargetTarget,
+  pkgsHostHost,
   bash,
   curl,
   rustc,
@@ -13,6 +14,7 @@
   date,
   selectedComponents,
   availableComponents ? selectedComponents,
+  enableLibsecret ? false,
 }:
 let
   inherit (lib) optional;
@@ -80,12 +82,17 @@ symlinkJoin {
         ''}
       fi
     done
-    ${lib.optionalString stdenv.isDarwin ''
+    ${lib.optionalString (stdenv.isDarwin || enableLibsecret) ''
       cargo="$out/bin/cargo"
       if [ -e "$cargo" ]; then
         cp --remove-destination "$(realpath -e $cargo)" "$cargo"
         chmod +w "$cargo"
-        install_name_tool -change "/usr/lib/libcurl.4.dylib" "${curl.out}/lib/libcurl.4.dylib" "$cargo"
+        ${lib.optionalString stdenv.isDarwin ''
+          install_name_tool -change "/usr/lib/libcurl.4.dylib" "${curl.out}/lib/libcurl.4.dylib" "$cargo"
+        ''}
+        ${lib.optionalString enableLibsecret ''
+          patchelf --add-needed ${pkgsHostHost.libsecret}/lib/libsecret-1.so.0 $out/bin/cargo
+        ''}
       fi
     ''}
     shopt nullglob

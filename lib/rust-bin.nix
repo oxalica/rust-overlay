@@ -341,6 +341,10 @@ let
   #                       All extensions in this list will be installed for the target architectures.
   #                       *Attention* If you want to install an extension like rust-src, that has no fixed architecture (arch *),
   #                       you will need to specify this extension in the extensions options or it will not be installed!
+  #   enableLibsecret   - Enable libsecret integration for cargo.
+  #                       See <https://doc.rust-lang.org/cargo/reference/registry-authentication.html#cargolibsecret>
+  #                       This will increase the closure size and slow down eval time.
+  #                       Enabled by default on Linux for profile other than "minimal".
   toolchainFromManifest =
     manifest:
     let
@@ -396,10 +400,12 @@ let
               extensions,
               targets,
               targetExtensions,
+              enableLibsecret,
             }:
             mkAggregated {
               pname = "rust-${name}";
               inherit (manifest) version date;
+              inherit enableLibsecret;
               availableComponents = componentSet.${rustHostPlatform};
               selectedComponents = resolveComponents {
                 name = "rust-${name}-${manifest.version}";
@@ -426,6 +432,7 @@ let
             extensions = [ ];
             targets = [ ];
             targetExtensions = [ ];
+            enableLibsecret = name != "minimal" && stdenv.hostPlatform.isLinux;
           };
 
       profiles = mapAttrs mkProfile manifest.profiles;
