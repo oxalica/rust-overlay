@@ -6,6 +6,7 @@
   gnutar,
   autoPatchelfHook,
   bintools,
+  lndir,
   zlib,
   gccForLibs,
   apple-sdk ? null,
@@ -135,7 +136,11 @@ let
         # Since "$out/lib" has the same layout as "${rustc}/lib" because of
         # symlink, it should not cause issues in `symlinkJoin` from `mkAggregated`.
         optionalString (hostPlatform.isDarwin && linksToRustc) ''
-          ln -sT "${self.rustc}/lib" "$out/lib"
+          if [[ -d "$out/lib" ]]; then
+            ${lndir}/bin/lndir -silent "${self.rustc}/lib" "$out/lib"
+          else
+            ln -sT "${self.rustc}/lib" "$out/lib"
+          fi
         ''
 
         # Wrap the shipped `rust-lld` (lld), which is used by default on some targets.
