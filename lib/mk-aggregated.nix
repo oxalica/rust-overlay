@@ -7,6 +7,7 @@
   bash,
   curl,
   rustc,
+  makeWrapper,
 }:
 {
   pname,
@@ -43,6 +44,10 @@ symlinkJoin {
   # Ourselves have offset -1. In order to make these offset -1 dependencies of downstream derivation,
   # they are offset 0 propagated.
 
+  nativeBuildInputs = [
+    makeWrapper
+  ];
+
   # CC for build script linking.
   # Workaround: should be `pkgsHostHost.cc` but `stdenv`'s cc itself have -1 offset.
   depsHostHostPropagated = [ stdenv.cc ];
@@ -55,57 +60,40 @@ symlinkJoin {
   # Link dependency for target, required by darwin std.
   depsTargetTargetPropagated = optional (targetPlatform.isDarwin) pkgsTargetTarget.libiconv;
 
-  # If rustc or rustdoc is in the derivation, we need to copy their
-  # executable into the final derivation. This is required
-  # for making them find the correct SYSROOT.
+  # We want to set the default sysroot to the aggregated directory, but
+  # librustc_driver (and all binaries linking to it) will infer the default
+  # sysroot relative to librustc_driver. So we need to copy these binaries
+  # instead of symlink them.
+  # FIXME: This duplicates the space usage. `librustc_driver` is huge (150MiB).
   postBuild = ''
-    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri}; do
+    shopt nullglob
+    for file in \
+      $out/bin/{rustc,rustdoc,miri,cargo-miri,cargo-clippy,clippy-driver} \
+      $out/lib/{librustc_driver*,rustlib/*/lib/librustc_driver*}
+    do
       if [ -e $file ]; then
         cp --remove-destination "$(realpath -e $file)" $file
-      fi
-    done
-  ''
-  # Workaround: https://github.com/rust-lang/rust/pull/103660
-  # FIXME: This duplicates the space usage since `librustc_driver` is huge.
-  + lib.optionalString (date == null || date >= "2022-11-01") ''
-    for file in $out/bin/{rustc,rustdoc,miri,cargo-miri,cargo-clippy,clippy-driver}; do
-      if [ -e $file ]; then
-        [[ $file != */*clippy* ]] || cp --remove-destination "$(realpath -e $file)" $file
-        chmod +w $file
         ${lib.optionalString stdenv.isLinux ''
+          chmod +w "$file"
           if prev_rpath="$(patchelf --print-rpath "$file")"; then
             patchelf --set-rpath "$out/lib''${prev_rpath:+:}$prev_rpath" "$file"
           fi
         ''}
-        ${lib.optionalString stdenv.isDarwin ''
-          install_name_tool -add_rpath $out/lib "$file" || true
-        ''}
       fi
     done
+
     ${lib.optionalString (stdenv.isDarwin || enableLibsecret) ''
       cargo="$out/bin/cargo"
       if [ -e "$cargo" ]; then
-        cp --remove-destination "$(realpath -e $cargo)" "$cargo"
-        chmod +w "$cargo"
-        ${lib.optionalString stdenv.isDarwin ''
-          install_name_tool -change "/usr/lib/libcurl.4.dylib" "${curl.out}/lib/libcurl.4.dylib" "$cargo"
-        ''}
-        ${lib.optionalString enableLibsecret ''
-          patchelf --add-needed ${pkgsHostHost.libsecret}/lib/libsecret-1.so.0 $out/bin/cargo
-        ''}
+        cargoOriginal="$(readlink "$cargo")"
+        rm "$cargo"
+        makeWrapper "$cargoOriginal" "$cargo" \
+          ${lib.optionalString stdenv.isDarwin ''--prefix LD_LIBRARY_PATH : "${curl.out}/lib"''} \
+          ${lib.optionalString enableLibsecret ''--prefix LD_LIBRARY_PATH : "${pkgsHostHost.libsecret}/lib"''} \
+
       fi
     ''}
-    shopt nullglob
-    for file in $out/lib/librustc_driver*; do
-      cp --remove-destination "$(realpath -e $file)" $file
-    done
 
-    # installed with rustc-dev
-    for file in $out/lib/rustlib/*/lib/librustc_driver*; do
-      cp --remove-destination "$(realpath -e $file)" $file
-    done
-  ''
-  + ''
     if [ -e $out/bin/cargo-miri ]; then
       mv $out/bin/{cargo-miri,.cargo-miri-wrapped}
       cp -f ${./cargo-miri-wrapper.sh} $out/bin/cargo-miri
