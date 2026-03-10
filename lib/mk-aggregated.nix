@@ -88,7 +88,14 @@ symlinkJoin {
         cargoOriginal="$(readlink "$cargo")"
         rm "$cargo"
         makeWrapper "$cargoOriginal" "$cargo" \
-          ${lib.optionalString stdenv.isDarwin ''--prefix LD_LIBRARY_PATH : "${curl.out}/lib"''} \
+          ${
+            # It seems `LD_LIBRARY_PATH` does not work on Darwin, although the documentation says it should.
+            # Maybe it is because RPATH takes precedence over LD_LIBRARY_PATH but not over DYLD_LIBRARY_PATH.
+            # Note that the upstream cargo has RPATH to a system curl which reads out-of-sandbox paths.
+            # See: <https://github.com/oxalica/rust-overlay/pull/251#discussion_r2904701116>
+            # Docs: <https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/UsingDynamicLibraries.html>
+            lib.optionalString stdenv.isDarwin ''--prefix DYLD_LIBRARY_PATH : "${curl.out}/lib"''
+          } \
           ${lib.optionalString enableLibsecret ''--prefix LD_LIBRARY_PATH : "${pkgsHostHost.libsecret}/lib"''} \
 
       fi
