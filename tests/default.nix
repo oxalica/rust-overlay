@@ -41,12 +41,12 @@ let
   assertUrl = drv: url: assertEq (head drv.src.urls) url;
 
   testNightly = {
-    date = "2024-08-01";
-    version = "1.82.0-nightly-2024-08-01";
+    date = "2026-01-01";
+    version = "1.94.0-nightly-2026-01-01";
   };
   testBeta = {
-    date = "2024-07-26";
-    version = "1.81.0-beta.2-2024-07-26";
+    date = "2026-01-10";
+    version = "1.93.0-beta.6-2026-01-10";
   };
 
 in
