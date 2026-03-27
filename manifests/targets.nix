@@ -135,4 +135,6 @@
   _133 = "aarch64-apple-visionos-sim";
   _134 = "aarch64-apple-watchos";
   _135 = "aarch64-apple-watchos-sim";
+  _136 = "x86_64-unknown-linux-gnumsan";
+  _137 = "x86_64-unknown-linux-gnutsan";
 }
