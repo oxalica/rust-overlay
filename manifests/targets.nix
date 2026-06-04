@@ -137,4 +137,9 @@
   _135 = "aarch64-apple-watchos-sim";
   _136 = "x86_64-unknown-linux-gnumsan";
   _137 = "x86_64-unknown-linux-gnutsan";
+  _138 = "thumbv7a-none-eabi";
+  _139 = "thumbv7a-none-eabihf";
+  _140 = "thumbv7r-none-eabi";
+  _141 = "thumbv7r-none-eabihf";
+  _142 = "thumbv8r-none-eabihf";
 }
