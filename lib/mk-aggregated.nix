@@ -69,7 +69,8 @@ symlinkJoin {
     shopt nullglob
     for file in \
       $out/bin/{rustc,rustdoc,miri,cargo-miri,cargo-clippy,clippy-driver} \
-      $out/lib/{librustc_driver*,rustlib/*/lib/librustc_driver*}
+      $out/lib/{librustc_driver*,rustlib/*/lib/librustc_driver*} \
+      $out/lib/rustlib/*/bin/{rust-lld,rust-objcopy,wasm-component-ld}
     do
       if [ -e $file ]; then
         cp --remove-destination "$(realpath -e $file)" $file
