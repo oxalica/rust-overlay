@@ -142,4 +142,5 @@
   _140 = "thumbv7r-none-eabi";
   _141 = "thumbv7r-none-eabihf";
   _142 = "thumbv8r-none-eabihf";
+  _143 = "aarch64-unknown-freebsd";
 }
