@@ -40,6 +40,7 @@ let
       # These components link to `librustc_driver*.so` or `libLLVM*.so`.
       linksToRustc = elem pname [
         "clippy-preview"
+        "enzyme-preview"
         "miri-preview"
         "rls-preview"
         "rust-analyzer-preview"
