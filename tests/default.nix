@@ -237,15 +237,17 @@ optionalAttrs
     targets = [ "x86_64-apple-darwin" ];
     targetExtensions = [ "rust-docs" ];
   };
-  aarch64-darwin-rustlib-tools-shared-llvm = pkgs.runCommand "aarch64-darwin-rustlib-tools-shared-llvm" { } ''
-    for rustlib in \
-      "${nightly.${sharedLlvmNightly}.rustc}/lib/rustlib/${rustHostPlatform}" \
-      "${nightly.${sharedLlvmNightly}.default}/lib/rustlib/${rustHostPlatform}"
-    do
-      "$rustlib/bin/rust-lld" -flavor wasm --version
-      "$rustlib/bin/rust-objcopy" --version
-      "$rustlib/bin/wasm-component-ld" --version
-    done
-    touch "$out"
-  '';
+  aarch64-darwin-rustlib-tools-shared-llvm =
+    pkgs.runCommand "aarch64-darwin-rustlib-tools-shared-llvm" { }
+      ''
+        for rustlib in \
+          "${nightly.${sharedLlvmNightly}.rustc}/lib/rustlib/${rustHostPlatform}" \
+          "${nightly.${sharedLlvmNightly}.default}/lib/rustlib/${rustHostPlatform}"
+        do
+          "$rustlib/bin/rust-lld" -flavor wasm --version
+          "$rustlib/bin/rust-objcopy" --version
+          "$rustlib/bin/wasm-component-ld" --version
+        done
+        touch "$out"
+      '';
 }
