@@ -144,6 +144,25 @@ let
           fi
         ''
 
+        # Darwin rustlib helper tools live under `lib/rustlib/<target>/bin`
+        # and use `@loader_path/../lib`, so expose rustc's LLVM dylib there.
+        + optionalString (hostPlatform.isDarwin && pname == "rustc") ''
+          if [[ -e "$out/lib/libLLVM.dylib" ]]; then
+            for binDir in "$out"/lib/rustlib/*/bin; do
+              if [[ ! -d "$binDir" ]]; then
+                continue
+              fi
+              if [[ -e "$binDir/rust-lld" || -e "$binDir/rust-objcopy" || -e "$binDir/wasm-component-ld" ]]; then
+                libDir="$(dirname "$binDir")/lib"
+                mkdir -p "$libDir"
+                if [[ ! -e "$libDir/libLLVM.dylib" && ! -L "$libDir/libLLVM.dylib" ]]; then
+                  ln -s ../../../libLLVM.dylib "$libDir/libLLVM.dylib"
+                fi
+              fi
+            done
+          fi
+        ''
+
         # Wrap the shipped `rust-lld` (lld), which is used by default on some targets.
         # Unfortunately there is no hook to conveniently wrap CC tools inside
         # derivation and `wrapBintools` is designed for wrapping a standalone
