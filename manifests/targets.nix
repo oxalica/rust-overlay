@@ -143,4 +143,6 @@
   _141 = "thumbv7r-none-eabihf";
   _142 = "thumbv8r-none-eabihf";
   _143 = "aarch64-unknown-freebsd";
+  _144 = "loongarch32-unknown-none";
+  _145 = "loongarch32-unknown-none-softfloat";
 }
