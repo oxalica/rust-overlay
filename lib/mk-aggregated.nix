@@ -73,7 +73,7 @@ symlinkJoin {
     do
       if [ -e $file ]; then
         cp --remove-destination "$(realpath -e $file)" $file
-        ${lib.optionalString stdenv.isLinux ''
+        ${lib.optionalString stdenv.hostPlatform.isLinux ''
           chmod +w "$file"
           if prev_rpath="$(patchelf --print-rpath "$file")"; then
             patchelf --set-rpath "$out/lib''${prev_rpath:+:}$prev_rpath" "$file"
@@ -82,7 +82,7 @@ symlinkJoin {
       fi
     done
 
-    ${lib.optionalString (stdenv.isDarwin || enableLibsecret) ''
+    ${lib.optionalString (stdenv.hostPlatform.isDarwin || enableLibsecret) ''
       cargo="$out/bin/cargo"
       if [ -e "$cargo" ]; then
         cargoOriginal="$(readlink "$cargo")"
@@ -94,7 +94,7 @@ symlinkJoin {
             # Note that the upstream cargo has RPATH to a system curl which reads out-of-sandbox paths.
             # See: <https://github.com/oxalica/rust-overlay/pull/251#discussion_r2904701116>
             # Docs: <https://developer.apple.com/library/archive/documentation/DeveloperTools/Conceptual/DynamicLibraries/100-Articles/UsingDynamicLibraries.html>
-            lib.optionalString stdenv.isDarwin ''--prefix DYLD_LIBRARY_PATH : "${curl.out}/lib"''
+            lib.optionalString stdenv.hostPlatform.isDarwin ''--prefix DYLD_LIBRARY_PATH : "${curl.out}/lib"''
           } \
           ${lib.optionalString enableLibsecret ''--prefix LD_LIBRARY_PATH : "${pkgsHostHost.libsecret}/lib"''} \
 
