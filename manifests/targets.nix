@@ -145,4 +145,5 @@
   _143 = "aarch64-unknown-freebsd";
   _144 = "loongarch32-unknown-none";
   _145 = "loongarch32-unknown-none-softfloat";
+  _146 = "wasm32-wasip3";
 }
