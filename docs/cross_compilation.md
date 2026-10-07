@@ -93,5 +93,12 @@ To try it,
 2. `nix develop` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
+Alternatively, you may use the common `import nixpkgs`-approach instead of `mkRustBin`, especially if you only plan to `import nixpkgs` once. This is probably the case for a typical simple and small project. An example of this can be seen in
+[`examples/cross-mingw/flake.nix`](../examples/cross-mingw/flake.nix) (cross-compiling to Windows).
+To try it,
+1. `cd` into `examples/cross-mingw`.
+2. `nix develop` to enter the development environment.
+3. `make run` to build and run the program with Wine.
+
 [wiki-cross]: https://wiki.nixos.org/wiki/Cross_Compiling#How_to_specify_dependencies
 [flake-cross-issue]: https://github.com/NixOS/nix/issues/5157
