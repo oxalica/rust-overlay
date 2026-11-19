@@ -179,16 +179,16 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 - Latest stable or beta rust profile, **with extra components or target support**.
 
   ```nix
-  rust-bin.stable.latest.default.override {
+  (rust-bin.stable.latest.default.override {
     extensions = [ "rust-src" ];
     targets = [ "arm-unknown-linux-gnueabihf" ];
-  }
+  })
   ```
 
 - Latest **nightly** rust profile.
 
   ```nix
-  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default) # or `toolchain.minimal`
+  (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default)) # or `toolchain.minimal`
   ```
 
   *Note: Don't use `rust-bin.nightly.latest`. Your build would fail when some components missing on some days.
@@ -197,10 +197,10 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 - Latest **nightly** rust profile, **with extra components or target support**.
 
   ```nix
-  rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
+  (rust-bin.selectLatestNightlyWith (toolchain: toolchain.default.override {
     extensions = [ "rust-src" ];
     targets = [ "arm-unknown-linux-gnueabihf" ];
-  })
+  }))
   ```
 
 - A specific version of rust:
@@ -216,20 +216,20 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
   you can simply use `fromRustupToolchainFile` to get the customized toolchain derivation.
 
   ```nix
-  rust-bin.fromRustupToolchainFile ./rust-toolchain
+  (rust-bin.fromRustupToolchainFile ./rust-toolchain)
   ```
 
 - Toolchain with specific rustc git revision.
 
   This is useful for development of rust components like [MIRI][miri], which requires a specific revision of rust.
   ```nix
-  rust-bin.fromRustcRev {
+  (rust-bin.fromRustcRev {
     rev = "a2cd91ceb0f156cb442d75e12dc77c3d064cdde4";
     components = {
       rustc = "sha256-x+OkPVStX00AiC3GupIdGzWluIK1BnI4ZCBbg72+ZuI=";
       rust-src = "sha256-13PpzzYtd769Xkb0QzHpNfYCOnLMWFolc9QyYq98z2k=";
     };
-  }
+  })
   ```
 
   *Warning: This may not always work (including the example below) since upstream CI periodically purges old artifacts.*
