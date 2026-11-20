@@ -224,6 +224,8 @@ let
             suffixSalt
             wrapperName
             coreutils_bin
+            mktemp
+            rm
             ;
           hardening_unsupported_flags = "";
 
