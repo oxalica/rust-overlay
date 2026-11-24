@@ -29,7 +29,7 @@ Features:
   Earlier versions may be accessed via
   [old snapshot tags](https://github.com/oxalica/rust-overlay/tags).
 
-- We targets nixos-unstable and supported releases of NixOS, on x86\_64-linux.
+- We target nixos-unstable and supported releases of NixOS, on x86\_64-linux.
   They are tested on CI. Other platforms and nixpkgs channels may also work but
   is not guaranteed.
 
