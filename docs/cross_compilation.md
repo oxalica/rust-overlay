@@ -8,7 +8,7 @@ To try examples,
 2. `nix-shell` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
-The structure of `shell.nix` should like this,
+The structure of `shell.nix` should look like this,
 ```nix
 # Import from global `<nixpkgs>`. Can also be from flake input if you like.
 (import <nixpkgs> {
