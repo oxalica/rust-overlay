@@ -4,7 +4,7 @@
 
 There are examples for cross compilation in [`example` directory](../examples).
 To try examples,
-1. `cd` into `example/cross-aarch64` (or other directory).
+1. `cd` into `examples/cross-aarch64` (or other directory).
 2. `nix-shell` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
@@ -89,7 +89,7 @@ pkgs.callPackage (
 The full example can be seen in
 [`examples/cross-aarch64/flake.nix`](../examples/cross-aarch64/flake.nix).
 To try it,
-1. `cd` into `example/cross-aarch64`.
+1. `cd` into `examples/cross-aarch64`.
 2. `nix develop` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
