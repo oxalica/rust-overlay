@@ -48,7 +48,7 @@ mkShell {
   # Usually are libraries to be linked.
   buildInputs = [ openssl ];
 
-  # Tell cargo about the linker and an optional emulater. So they can be used in `cargo build`
+  # Tell cargo about the linker and an optional emulator. So they can be used in `cargo build`
   # and `cargo run`.
   # Environment variables are in format `CARGO_TARGET_<UPPERCASE_UNDERSCORE_RUST_TRIPLE>_LINKER`.
   # They can also be set in `.cargo/config.toml` instead.
