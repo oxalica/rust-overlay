@@ -38,7 +38,7 @@ mkShell {
   ];
 
   # Build-time tools which are target agnostic. build = host = target = your-machine.
-  # Emulaters should essentially also go `nativeBuildInputs`. But with some packaging issue,
+  # Emulators should essentially also go `nativeBuildInputs`. But with some packaging issue,
   # currently it would cause some rebuild.
   # We put them here just for a workaround.
   # See: https://github.com/NixOS/nixpkgs/pull/146583
