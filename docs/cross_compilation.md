@@ -29,7 +29,7 @@ mkShell {
   # Typically contains,
   # - Configure-related: cmake, pkg-config
   # - Compiler-related: gcc, rustc, binutils
-  # - Code generators run at build time: yacc, bision
+  # - Code generators run at build time: yacc, bison
   nativeBuildInputs = [
     # `minimal` is enough for basic building and running.
     # Can also be `default` to bring other components like `rustfmt`, `clippy`, and etc.
