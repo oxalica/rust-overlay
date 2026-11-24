@@ -64,7 +64,7 @@ And then feel free to use it anywhere like
 **Warning: Only the output `overlay`/`overlays` are currently stable. Use other outputs at your own risk!**
 
 For a quick play, just use `nix shell` to bring the latest stable rust toolchain into scope.
-(All commands below requires preview version of Nix with flake support.)
+(All commands below require preview version of Nix with flake support.)
 ```shell
 $ nix shell github:oxalica/rust-overlay
 $ rustc --version # This is only an example. You may get a newer version here.
