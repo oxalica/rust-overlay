@@ -153,7 +153,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 1. Change the channel URL to `https://github.com/oxalica/rust-overlay/archive/master.tar.gz`,
    or flake URL to `github:oxalica/rust-overlay` for Nix Flakes.
 2. Good to go! `latest.*`, `rustChannel*.*` and friends are made compatible with [nixpkgs-mozilla].
-   You don't necessary need to change anything.
+   You don't necessarily need to change anything.
 3. You can also optionally change to [the `rust-bin` interface](#cheat-sheet-common-usage-of-rust-bin),
    which provides more functionality like "latest nightly with specific components available" or
    "from `rust-toolchain` file". It also has nix-aware cross-compilation support.
