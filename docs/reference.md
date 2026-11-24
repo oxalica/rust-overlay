@@ -1,6 +1,6 @@
 # Reference
 
-We provides two entry interfaces:
+We provide two entry interfaces:
 
 1.  Overlay interface, via `default.nix` (non-flake) or
     `rust-overlay.overlays.default` (flake).
