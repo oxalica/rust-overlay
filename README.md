@@ -234,7 +234,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
   *Warning: This may not always work (including the example below) since upstream CI periodically purges old artifacts.*
 
-- There also an cross-compilation example in [`examples/cross-aarch64`].
+- There is also a cross-compilation example in [`examples/cross-aarch64`].
 
 ## License
 
