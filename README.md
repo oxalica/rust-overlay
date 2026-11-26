@@ -29,7 +29,7 @@ Features:
   Earlier versions may be accessed via
   [old snapshot tags](https://github.com/oxalica/rust-overlay/tags).
 
-- We targets nixos-unstable and supported releases of NixOS, on x86\_64-linux.
+- We target nixos-unstable and supported releases of NixOS, on x86\_64-linux.
   They are tested on CI. Other platforms and nixpkgs channels may also work but
   is not guaranteed.
 
@@ -64,7 +64,7 @@ And then feel free to use it anywhere like
 **Warning: Only the output `overlay`/`overlays` are currently stable. Use other outputs at your own risk!**
 
 For a quick play, just use `nix shell` to bring the latest stable rust toolchain into scope.
-(All commands below requires preview version of Nix with flake support.)
+(All commands below require preview version of Nix with flake support.)
 ```shell
 $ nix shell github:oxalica/rust-overlay
 $ rustc --version # This is only an example. You may get a newer version here.
@@ -153,7 +153,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 1. Change the channel URL to `https://github.com/oxalica/rust-overlay/archive/master.tar.gz`,
    or flake URL to `github:oxalica/rust-overlay` for Nix Flakes.
 2. Good to go! `latest.*`, `rustChannel*.*` and friends are made compatible with [nixpkgs-mozilla].
-   You don't necessary need to change anything.
+   You don't necessarily need to change anything.
 3. You can also optionally change to [the `rust-bin` interface](#cheat-sheet-common-usage-of-rust-bin),
    which provides more functionality like "latest nightly with specific components available" or
    "from `rust-toolchain` file". It also has nix-aware cross-compilation support.
@@ -234,7 +234,7 @@ Running `nix develop` will create a shell with the default beta Rust toolchain i
 
   *Warning: This may not always work (including the example below) since upstream CI periodically purges old artifacts.*
 
-- There also an cross-compilation example in [`examples/cross-aarch64`].
+- There is also a cross-compilation example in [`examples/cross-aarch64`].
 
 ## License
 

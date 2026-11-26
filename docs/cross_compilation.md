@@ -4,11 +4,11 @@
 
 There are examples for cross compilation in [`example` directory](../examples).
 To try examples,
-1. `cd` into `example/cross-aarch64` (or other directory).
+1. `cd` into `examples/cross-aarch64` (or other directory).
 2. `nix-shell` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
-The structure of `shell.nix` should like this,
+The structure of `shell.nix` should look like this,
 ```nix
 # Import from global `<nixpkgs>`. Can also be from flake input if you like.
 (import <nixpkgs> {
@@ -29,7 +29,7 @@ mkShell {
   # Typically contains,
   # - Configure-related: cmake, pkg-config
   # - Compiler-related: gcc, rustc, binutils
-  # - Code generators run at build time: yacc, bision
+  # - Code generators run at build time: yacc, bison
   nativeBuildInputs = [
     # `minimal` is enough for basic building and running.
     # Can also be `default` to bring other components like `rustfmt`, `clippy`, and etc.
@@ -38,7 +38,7 @@ mkShell {
   ];
 
   # Build-time tools which are target agnostic. build = host = target = your-machine.
-  # Emulaters should essentially also go `nativeBuildInputs`. But with some packaging issue,
+  # Emulators should essentially also go `nativeBuildInputs`. But with some packaging issue,
   # currently it would cause some rebuild.
   # We put them here just for a workaround.
   # See: https://github.com/NixOS/nixpkgs/pull/146583
@@ -48,7 +48,7 @@ mkShell {
   # Usually are libraries to be linked.
   buildInputs = [ openssl ];
 
-  # Tell cargo about the linker and an optional emulater. So they can be used in `cargo build`
+  # Tell cargo about the linker and an optional emulator. So they can be used in `cargo build`
   # and `cargo run`.
   # Environment variables are in format `CARGO_TARGET_<UPPERCASE_UNDERSCORE_RUST_TRIPLE>_LINKER`.
   # They can also be set in `.cargo/config.toml` instead.
@@ -89,7 +89,7 @@ pkgs.callPackage (
 The full example can be seen in
 [`examples/cross-aarch64/flake.nix`](../examples/cross-aarch64/flake.nix).
 To try it,
-1. `cd` into `example/cross-aarch64`.
+1. `cd` into `examples/cross-aarch64`.
 2. `nix develop` to enter the development environment.
 3. `make run` to build and run the program in an emulator.
 
